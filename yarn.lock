@@ -2338,6 +2338,11 @@ json5@^2.1.0:
   dependencies:
     minimist "^1.2.0"
 
+jsonpatch-to-mongodb@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/jsonpatch-to-mongodb/-/jsonpatch-to-mongodb-1.0.0.tgz#ccf0abf7b7a2741857c1683f975597c752de0fd9"
+  integrity sha512-TYh+KY5bB+JUEV+ICxp1vIzw5UyHstvCXzRGT9L3YcytYTGc/2lBEGTbmJJYsw9pm4nnsej84kAGBSWy650C1A==
+
 jsprim@^1.2.2:
   version "1.4.1"
   resolved "https://registry.yarnpkg.com/jsprim/-/jsprim-1.4.1.tgz#313e66bc1e5cc06e438bc1b7499c2e5c56acb6a2"

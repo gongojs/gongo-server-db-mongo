@@ -8,6 +8,7 @@
     "jest": "^25.1.0"
   },
   "dependencies": {
+    "jsonpatch-to-mongodb": "^1.0.0",
     "mongodb": "^3.5.2"
   }
 }
