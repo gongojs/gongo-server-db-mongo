@@ -2338,10 +2338,17 @@ json5@^2.1.0:
   dependencies:
     minimist "^1.2.0"
 
-jsonpatch-to-mongodb@^1.0.0:
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/jsonpatch-to-mongodb/-/jsonpatch-to-mongodb-1.0.0.tgz#ccf0abf7b7a2741857c1683f975597c752de0fd9"
-  integrity sha512-TYh+KY5bB+JUEV+ICxp1vIzw5UyHstvCXzRGT9L3YcytYTGc/2lBEGTbmJJYsw9pm4nnsej84kAGBSWy650C1A==
+jsonpatch-to-mongodb@0.1.1:
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/jsonpatch-to-mongodb/-/jsonpatch-to-mongodb-0.1.1.tgz#e75c74a89489cd2a7669b2e006203e3b53e09757"
+  integrity sha1-51x0qJSJzSp2abLgBiA+O1Pgl1c=
+  dependencies:
+    jsonpath-to-dot "~0.1.0"
+
+jsonpath-to-dot@~0.1.0:
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/jsonpath-to-dot/-/jsonpath-to-dot-0.1.0.tgz#c8e24538d9a07ab30c219cbd1b79b527df26fe5c"
+  integrity sha1-yOJFONmgerMMIZy9G3m1J98m/lw=
 
 jsprim@^1.2.2:
   version "1.4.1"
