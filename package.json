@@ -1,8 +1,22 @@
 {
   "name": "gongo-server-db-mongo",
   "version": "0.0.1",
-  "main": "lib/index.js",
+  "author": "Gadi Cohen <dragon@wastelands.net>",
+  "description": "MongoDB support for GongoJS gongo-server",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gongojs/gongo-server-db-mongo"
+  },
+  "main": "lib/index.js",
+  "keywords": [
+    "database",
+    "serverless",
+    "mongodb",
+    "mongo",
+    "gongo",
+    "gongojs"
+  ],
   "devDependencies": {
     "eslint": "^6.8.0",
     "jest": "^25.1.0"
