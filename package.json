@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "jsonpatch-to-mongodb": "0.1.1",
-    "mongodb": "^3.5.2"
+    "mongodb": "^4.6.0"
   },
   "peerDependencies": {
     "gongo-server": "^0.1.1"

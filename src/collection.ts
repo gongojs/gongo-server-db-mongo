@@ -1,18 +1,33 @@
 //const toMongoDb = require('jsonpatch-to-mongodb');
 const toMongoDb = require("./jsonpatch-to-mongodb");
-const Cursor = require("./cursor");
+import Cursor from "./cursor.js";
+import type DatabaseAdapter from "./databaseAdapter.js";
+import type { ChangeSetUpdate } from "gongo-server/lib/DatabaseAdapter.js";
+import type {
+  Document,
+  Filter,
+  ReplaceOptions,
+  UpdateFilter,
+  UpdateOptions,
+} from "mongodb";
 
-class Collection {
-  constructor(db, name) {
+export default class Collection {
+  db: DatabaseAdapter;
+  name: string;
+  _indexCreated: boolean;
+  allows: Record<string, unknown>;
+
+  constructor(db: DatabaseAdapter, name: string) {
     this.db = db;
     this.name = name;
     this._indexCreated = false;
     this.allows = { insert: false, update: false, delete: false };
     // https://github.com/Meteor-Community-Packages/meteor-collection-hooks TODO
-    this.before = { insertOne: [] };
+    // this.before = { insertOne: [] };
   }
 
-  allow(operationName, func) {
+  /*
+  allow(operationName: string, func) {
     if (
       !Object.prototype.hasOwnProperty.call(
         this.allows.hasOwnProperty,
@@ -29,17 +44,22 @@ class Collection {
 
     this.allows[operationName] = func;
   }
+  */
 
+  /*
   on(eventName, func) {
     if (this.events[eventName]) this.events[eventName].push(func);
     else throw new Error("No such event: " + eventName);
   }
+  */
 
+  /*
   eventExec(eventName, args) {
     if (!this.events[eventName]) throw new Error("No such event: " + eventName);
 
     for (let func of this.events[eventName]) func.call(this, args);
   }
+  */
 
   async getReal() {
     const db = await this.db.dbPromise;
@@ -56,20 +76,20 @@ class Collection {
     return realColl;
   }
 
-  find(query) {
+  find(filter: Filter<Document>) {
     // deal with __updatedAts
     // if NO __updatedAt specified, should NOT include deleted records
     //   (because we're getting data for first time!)
 
-    return new Cursor(this, query);
+    return new Cursor(this, filter);
   }
 
-  async findOne(query) {
+  async findOne(filter: Filter<Document>) {
     const realColl = await this.getReal();
-    return await realColl.findOne(query);
+    return /* await */ realColl.findOne(filter);
   }
 
-  async insertOne(doc) {
+  async insertOne(doc: Document) {
     const realColl = await this.getReal();
 
     doc.__updatedAt = Date.now();
@@ -85,11 +105,11 @@ class Collection {
   gets correct server copy
    */
 
-  async insertMany(docArray) {
+  async insertMany(docArray: Array<Document>) {
     const realColl = await this.getReal();
 
     const now = Date.now();
-    for (let doc of docArray) doc.__updatedAt = now;
+    for (const doc of docArray) doc.__updatedAt = now;
 
     console.log(this.name + " insertMany: " + JSON.stringify(docArray));
     //return await realColl.insertMany(docArray, { ordered: false /* XXX TODO */ });
@@ -106,7 +126,7 @@ class Collection {
     await realColl.bulkWrite(bwArg);
   }
 
-  async markAsDeleted(idArray) {
+  async markAsDeleted(idArray: Array<string>) {
     const realColl = await this.getReal();
     console.log(this.name + " markAsDeleted: " + idArray.join(","));
 
@@ -122,27 +142,36 @@ class Collection {
     );
   }
 
-  async replaceOne(query, doc, options) {
+  async replaceOne(
+    filter: Filter<Document>,
+    doc: Document,
+    options: ReplaceOptions
+  ) {
     const realColl = await this.getReal();
 
-    if (!doc) throw new Error("not replacing " + query + " with empty doc");
+    if (!doc) throw new Error("not replacing " + filter + " with empty doc");
 
     doc.__updatedAt = Date.now();
-    return realColl.replaceOne(query, doc, options);
+    return realColl.replaceOne(filter, doc, options);
   }
 
-  async updateOne(query, update = {}, options) {
+  async updateOne(
+    filter: Filter<Document>,
+    update: Partial<Document> | UpdateFilter<Document> = {},
+    options?: UpdateOptions
+  ) {
     const realColl = await this.getReal();
 
     if (!update.$set) update.$set = {};
     update.$set.__updatedAt = Date.now();
 
-    return realColl.updateOne(query, update, options);
+    if (options) return realColl.updateOne(filter, update, options);
+    else return realColl.updateOne(filter, update);
   }
 
-  async applyPatch(entry) {
+  async applyPatch(entry: ChangeSetUpdate) {
     const _id = entry._id;
-    const update = toMongoDb(entry.patch);
+    const update = toMongoDb(entry.patch) as UpdateFilter<Document>;
 
     /*
     updateOne does this already.
@@ -151,14 +180,14 @@ class Collection {
     */
 
     console.log("patch", entry, update);
-    await this.updateOne(_id, update);
+    await this.updateOne({ _id }, update);
   }
 
-  async applyPatches(entries) {
+  async applyPatches(entries: Array<ChangeSetUpdate>) {
     const realColl = await this.getReal();
     const bulk = [];
 
-    for (let entry of entries) {
+    for (const entry of entries) {
       console.log("patch", entry.patch);
       const update = toMongoDb(entry.patch);
       console.log("update", update);
@@ -177,5 +206,3 @@ class Collection {
     await realColl.bulkWrite(bulk);
   }
 }
-
-module.exports = Collection;
