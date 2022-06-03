@@ -1,14 +1,13 @@
 class Cursor {
-
   constructor(coll, query) {
     this.db = coll.db;
     this.coll = coll;
     this.query = query;
   }
-  
+
   // TODO
   limit(limit) {
-    throw new Error("limit not implemented yet")
+    throw new Error("limit not implemented yet");
   }
 
   async toArray() {
@@ -16,7 +15,6 @@ class Cursor {
     const data = await db.collection(this.coll.name).find(this.query).toArray();
     return data;
   }
-
 }
 
 module.exports = Cursor;

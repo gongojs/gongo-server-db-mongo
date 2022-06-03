@@ -1,1 +1,1 @@
-module.exports = require('./databaseAdapter');
+module.exports = require("./databaseAdapter");
