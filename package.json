@@ -18,14 +18,23 @@
     "gongojs"
   ],
   "devDependencies": {
-    "eslint": "^8.12.0",
-    "jest": "^25.1.0",
-    "mongo-mock": "^4.0.0"
+    "@types/jest": "^28.1.0",
+    "@typescript-eslint/eslint-plugin": "^5.27.0",
+    "@typescript-eslint/parser": "^5.27.0",
+    "eslint": "^8.16.0",
+    "eslint-config-prettier": "^8.5.0",
+    "jest": "^28.1.0",
+    "mongo-mock": "^4.0.0",
+    "prettier": "^2.6.2",
+    "ts-jest": "^28.0.4",
+    "typescript": "^4.7.2"
   },
   "scripts": {
-    "lint": "eslint",
-    "test": "jest",
-    "coverage": "jest --coverage"
+    "lint": "eslint src",
+    "test": "jest src",
+    "coverage": "jest src --coverage",
+    "prettier": "prettier -w src",
+    "build": "tsc"
   },
   "dependencies": {
     "jsonpatch-to-mongodb": "0.1.1",
