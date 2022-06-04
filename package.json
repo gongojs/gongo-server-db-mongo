@@ -8,7 +8,8 @@
     "type": "git",
     "url": "https://github.com/gongojs/gongo-server-db-mongo"
   },
-  "main": "lib/index.js",
+  "main": "./lib/databaseAdapter.js",
+  "types": "./lib/databaseAdapter.d.js",
   "keywords": [
     "database",
     "serverless",
@@ -34,7 +35,8 @@
     "test": "jest src",
     "coverage": "jest src --coverage",
     "prettier": "prettier -w src",
-    "build": "tsc"
+    "build": "tsc",
+    "prepublish": "build"
   },
   "dependencies": {
     "jsonpatch-to-mongodb": "0.1.1",
