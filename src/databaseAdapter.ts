@@ -8,9 +8,9 @@ import type {
   PublicationResults,
 } from "gongo-server/lib/publications.js";
 
-import Cursor from "./cursor.js";
-import Collection from "./collection.js";
-import Users from "./users.js";
+import Cursor from "./cursor";
+import Collection from "./collection";
+import Users from "./users";
 
 class MongoDatabaseAdapter implements DatabaseAdapter {
   client: _MongoClient;

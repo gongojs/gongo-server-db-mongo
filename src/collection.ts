@@ -1,6 +1,6 @@
 //const toMongoDb = require('jsonpatch-to-mongodb');
 const toMongoDb = require("./jsonpatch-to-mongodb");
-import Cursor from "./cursor.js";
+import Cursor from "./cursor";
 import type DatabaseAdapter from "./databaseAdapter.js";
 import type { ChangeSetUpdate } from "gongo-server/lib/DatabaseAdapter.js";
 import type {
@@ -76,7 +76,7 @@ export default class Collection {
     return realColl;
   }
 
-  find(filter: Filter<Document>) {
+  find(filter: Filter<Document> = {}) {
     // deal with __updatedAts
     // if NO __updatedAt specified, should NOT include deleted records
     //   (because we're getting data for first time!)

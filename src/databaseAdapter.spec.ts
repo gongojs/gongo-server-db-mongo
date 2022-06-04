@@ -1,24 +1,29 @@
-//const MongoClient = require('mongo-mock').MongoClient;
-const ObjectID = require("mongodb").ObjectID;
+import { jest } from "@jest/globals";
+import { ObjectId } from "mongodb";
+import type { MongoClient } from "mongodb";
 
-const DatabaseAdapter = require("./databaseAdapter").default;
-const Users = require("./users");
-const Collection = require("./collection");
+import DatabaseAdapter from "./databaseAdapter";
+import Users from "./users";
+import type Collection from "./collection";
+import type Cursor from "./cursor";
+import type GongoServerless from "gongo-server/lib/serverless.js";
+import type { PublicationProps } from "gongo-server/lib/publications.js";
 
 const mongoUrl = "mongodb://localhost:27017/gongoTest";
 
-let FakeMongoClientWillThrow;
-class FakeMongoClient {
-  constructor(url) {}
-  connect(callback) {
+let FakeMongoClientWillThrow: Error | null = null;
+class _FakeMongoClient {
+  name = "";
+  connect(callback: (err: unknown, res?: unknown) => void) {
     if (FakeMongoClientWillThrow) callback(FakeMongoClientWillThrow);
     else callback(null, this);
   }
-  db(name) {
+  db(name: string) {
     this.name = name;
     return this;
   }
 }
+const FakeMongoClient = _FakeMongoClient as unknown as typeof MongoClient;
 
 describe("DatabaseAdapter", () => {
   describe("constructor", () => {
@@ -31,7 +36,8 @@ describe("DatabaseAdapter", () => {
     // not worth testing MongoClient default
     it("has default params", async () => {
       const dba = new DatabaseAdapter(mongoUrl, undefined, FakeMongoClient);
-      const client = await dba.dbPromise; //?
+      /* const client = */ await dba.dbPromise; //?
+      // @ts-expect-error: stub
       expect((await dba.dbPromise).name).toBe("gongo");
     });
 
@@ -52,7 +58,7 @@ describe("DatabaseAdapter", () => {
     describe("arson", () => {
       it("registers type", () => {
         const dba = new DatabaseAdapter(mongoUrl, "gongo", FakeMongoClient);
-        const gs = { ARSON: { registerType: jest.fn() } };
+        const gs = { ARSON: { registerType: jest.fn() } } as GongoServerless;
         dba.onInit(gs);
 
         expect(gs.ARSON.registerType.mock.calls[0][0]).toBe("ObjectID");
@@ -60,7 +66,7 @@ describe("DatabaseAdapter", () => {
         const { deconstruct, reconstruct } =
           gs.ARSON.registerType.mock.calls[0][1];
 
-        let oid = ObjectID.createFromHexString("aaaaaaaaaaaaaaaaaaaaaaaa");
+        let oid = ObjectId.createFromHexString("aaaaaaaaaaaaaaaaaaaaaaaa");
         expect(deconstruct(oid)).toEqual(["aaaaaaaaaaaaaaaaaaaaaaaa"]);
 
         oid = reconstruct(["aaaaaaaaaaaaaaaaaaaaaaaa"]);
@@ -74,28 +80,27 @@ describe("DatabaseAdapter", () => {
       const dba = new DatabaseAdapter(mongoUrl, "gongo", FakeMongoClient);
       const coll = dba.collection("test");
 
+      /*
       const insertManyRV = {},
         applyPatchesRV = {},
         markAsDeletedRV = {};
-      coll.insertMany = jest
-        .fn()
-        .mockReturnValueOnce(Promise.resolve(insertManyRV));
-      coll.applyPatches = jest
-        .fn()
-        .mockReturnValueOnce(Promise.resolve(applyPatchesRV));
-      coll.markAsDeleted = jest
-        .fn()
-        .mockReturnValueOnce(Promise.resolve(markAsDeletedRV));
+      */
+      coll.insertMany = jest.fn<typeof Collection.prototype.insertMany>();
+      //.mockReturnValueOnce(Promise.resolve(insertManyRV));
+      coll.applyPatches = jest.fn<typeof Collection.prototype.applyPatches>();
+      //.mockReturnValueOnce(Promise.resolve(applyPatchesRV));
+      coll.markAsDeleted = jest.fn<typeof Collection.prototype.markAsDeleted>();
+      //.mockReturnValueOnce(Promise.resolve(markAsDeletedRV));
 
       const changeSet = {
         test: {
-          insert: "insert",
-          update: "update",
-          delete: "delete",
+          insert: [],
+          update: [],
+          delete: [],
         },
       };
 
-      const result = await dba.processChangeSet(changeSet, "auth", "req");
+      /* const result = */ await dba.processChangeSet(changeSet);
 
       expect(coll.insertMany).toHaveBeenCalledWith(changeSet.test.insert);
       expect(coll.applyPatches).toHaveBeenCalledWith(changeSet.test.update);
@@ -106,9 +111,9 @@ describe("DatabaseAdapter", () => {
       const dba = new DatabaseAdapter(mongoUrl, "gongo", FakeMongoClient);
       const coll = dba.collection("test");
 
-      coll.insertMany = jest.fn();
-      coll.applyPatches = jest.fn();
-      coll.markAsDeleted = jest.fn();
+      coll.insertMany = jest.fn<typeof Collection.prototype.insertMany>();
+      coll.applyPatches = jest.fn<typeof Collection.prototype.applyPatches>();
+      coll.markAsDeleted = jest.fn<typeof Collection.prototype.markAsDeleted>();
 
       await dba.processChangeSet({ test: {} });
       expect(coll.insertMany).not.toHaveBeenCalled();
@@ -123,20 +128,28 @@ describe("DatabaseAdapter", () => {
       const coll = dba.collection("test");
       const cursor = coll.find({});
 
-      const docs = [{ _id: "id1" }, { _id: "id2" }];
-      cursor.toArray = jest.fn();
-      cursor.toArray.mockReturnValueOnce(Promise.resolve(docs));
+      const docs = [{ _id: new ObjectId() }, { _id: new ObjectId() }];
+      cursor.toArray = jest
+        .fn<typeof Cursor.prototype.toArray>()
+        .mockReturnValueOnce(Promise.resolve(docs));
 
-      const updatedAt = { test: "testUpdatedAt" };
+      const updatedAt = { test: 123 };
+      const pubPropsStub = { updatedAt } as unknown as PublicationProps;
 
-      // results = [ { coll: 'test', entries: [ [Object], [Object] ] } ]
-      const results = await dba.publishHelper(cursor, updatedAt, "auth", "req");
+      // results = { results: [ { coll: 'test', entries: [ [Object], [Object] ] } ] }
+      const pubResult = await dba.publishHelper(cursor, pubPropsStub);
 
-      expect(cursor.query.__updatedAt).toEqual({ $gt: updatedAt.test });
+      expect(cursor.filter.__updatedAt).toEqual({ $gt: updatedAt.test });
 
+      expect(typeof pubResult).toBe("object");
+      const results = pubResult.results;
+
+      expect(results).toBeDefined();
       expect(Array.isArray(results)).toBe(true);
+      // @ts-expect-error: asserted above
       expect(results.length).toBe(1);
 
+      // @ts-expect-error: asserted above
       const test = results[0];
       expect(test.coll).toBe("test");
       expect(test.entries.length).toBe(2);
@@ -149,11 +162,14 @@ describe("DatabaseAdapter", () => {
       const coll = dba.collection("test");
       const cursor = coll.find(); // <-- empty
 
-      cursor.toArray = jest.fn();
-      cursor.toArray.mockReturnValueOnce(Promise.resolve([]));
+      cursor.toArray = jest
+        .fn<typeof Cursor.prototype.toArray>()
+        .mockReturnValueOnce(Promise.resolve([]));
 
-      const updatedAt = { test: "testUpdatedAt" };
-      const results = await dba.publishHelper(cursor, updatedAt, "auth", "req");
+      const updatedAt = { test: 123 };
+      const pubPropsStub = { updatedAt } as unknown as PublicationProps;
+
+      /* const results = */ await dba.publishHelper(cursor, pubPropsStub);
     });
 
     it("does not set updatedAt for irrelevant colls", async () => {
@@ -161,23 +177,29 @@ describe("DatabaseAdapter", () => {
       const coll = dba.collection("test");
       const cursor = coll.find();
 
-      cursor.toArray = jest.fn();
-      cursor.toArray.mockReturnValueOnce(Promise.resolve([]));
+      cursor.toArray = jest
+        .fn<typeof Cursor.prototype.toArray>()
+        .mockReturnValueOnce(Promise.resolve([]));
 
-      const updatedAt = { notTest: "testUpdatedAt" };
-      await dba.publishHelper(cursor, updatedAt, "auth", "req");
-      expect(cursor.query.__updatedAt).not.toBeDefined();
+      const pubPropsStub = {
+        updatedAt: { notTest: 123 },
+      } as unknown as PublicationProps;
+      await dba.publishHelper(cursor, pubPropsStub);
+      expect(cursor.filter.__updatedAt).not.toBeDefined();
     });
 
     it("returns same value for non-cursors", async () => {
       const dba = new DatabaseAdapter(mongoUrl, "gongo", FakeMongoClient);
 
-      const obj = {},
-        arr = [];
-      expect(await dba.publishHelper(obj)).toBe(obj);
-      expect(await dba.publishHelper(arr)).toBe(arr);
-      expect(await dba.publishHelper(1)).toBe(1);
-      expect(await dba.publishHelper("str")).toBe("str");
+      const obj = {};
+      const arr = [];
+      const pubProps = {} as unknown as PublicationProps;
+
+      expect(await dba.publishHelper(obj, pubProps)).toBe(obj);
+      // if not a cursor, it should always be a doc.
+      // expect(await dba.publishHelper(arr)).toBe(arr);
+      // expect(await dba.publishHelper(1)).toBe(1);
+      // expect(await dba.publishHelper("str")).toBe("str");
     });
   }); /* procesChangeSet */
 });
