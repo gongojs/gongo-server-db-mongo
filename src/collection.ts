@@ -145,14 +145,16 @@ export default class Collection {
   async replaceOne(
     filter: Filter<Document>,
     doc: Document,
-    options: ReplaceOptions
+    options?: ReplaceOptions
   ) {
     const realColl = await this.getReal();
 
     if (!doc) throw new Error("not replacing " + filter + " with empty doc");
 
     doc.__updatedAt = Date.now();
-    return realColl.replaceOne(filter, doc, options);
+
+    if (options) return realColl.replaceOne(filter, doc, options);
+    else return realColl.replaceOne(filter, doc);
   }
 
   async updateOne(

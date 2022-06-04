@@ -3,6 +3,7 @@ import type {
   DbaUserEmail,
   DbaUserService,
   DbaUsers,
+  Profile,
 } from "gongo-server/lib/DatabaseAdapter.js";
 import { ObjectId } from "mongodb";
 import type {
@@ -44,6 +45,11 @@ export default class Users implements DbaUsers {
     >;
   }
 
+  async getUserWithEmailAndPassword(email: string, password: string) {
+    throw new Error("not implemented yet");
+    return null;
+  }
+
   /*
   async getUserWithEmailAndPassword(email: string, password: string) {
     const user = await this.users.findOne({ emails: { email } });
@@ -75,7 +81,7 @@ export default class Users implements DbaUsers {
   */
 
   async createUser(
-    callback: (dbaUser: Partial<DbaUser>) => Partial<DbaUser>
+    callback?: (dbaUser: Partial<DbaUser>) => void
   ): Promise<DbaUser> {
     const user: Partial<DbaUser> = {
       emails: [],
@@ -86,7 +92,8 @@ export default class Users implements DbaUsers {
 
     const result = await this.users.insertOne(user);
     if (result.acknowledged && result.insertedId instanceof ObjectId) {
-      return { _id: result.insertedId, ...user };
+      user._id = result.insertedId;
+      return user as DbaUser;
     } else {
       throw new Error(
         "Unexpected mongo result in createUser():" + JSON.stringify(result)
@@ -96,13 +103,13 @@ export default class Users implements DbaUsers {
 
   // TODO, move non-db stuff to to gongo-server
   async findOrCreateService(
-    email: string | Array<DbaUserEmail>,
+    email: string | Array<DbaUserEmail> | undefined,
     service: string,
     id: string,
-    profile: Record<string, unknown>,
+    profile: Profile,
     accessToken: string,
     refreshToken: string
-  ) {
+  ): Promise<DbaUser> {
     const filter: Filter<Document> = { $or: [] };
     if (email) {
       if (typeof email === "string") {
@@ -125,7 +132,7 @@ export default class Users implements DbaUsers {
         $and: [{ "services.service": service }, { "services.id": id }],
       });
 
-    let user = await this.users.findOne(filter);
+    let user = (await this.users.findOne(filter)) as DbaUser | null;
 
     if (user) {
       // Update service info & add any missing fields
@@ -140,44 +147,59 @@ export default class Users implements DbaUsers {
       if (!user.name) user.name = profile.name;
 
       // TODO, update "verified" field.
-      if (profile.emails && Array.isArray(profile.emails))
-        profile.emails.forEach((email) => {
-          if (!profile.emails.find((e) => e.value === email.value))
-            profile.emails.push(email);
+      const emailsArray = profile.emails;
+      if (Array.isArray(emailsArray)) {
+        emailsArray.forEach((email) => {
+          if (!emailsArray.find((e) => e.value === email.value))
+            emailsArray.push(email);
         });
+      }
 
       if (!user.photos) user.photos = [];
       user.photos = user.photos.filter(
-        (photo) => photo.provider !== profile.provider
+        (photo: Record<string, string>) => photo.provider !== profile.provider
       );
-      profile.photos.forEach((photo) => {
-        photo.provider = profile.provider;
-        user.photos.push(photo);
-      });
+      if (profile.photos) {
+        for (const photo of profile.photos) {
+          user.photos.push({ ...photo, provider: profile.provider });
+        }
+      }
 
+      // @ts-expect-error: purposefully inspect at runtime
       if (!user.gender && (profile.gender || profile._json.gender))
+        // @ts-expect-error: purposefully inspect at runtime
         user.gender = profile.gender || profile._json.gender;
 
+      // @ts-expect-error: purposefully inspect at runtime
       if (!user.gender && (profile.locale || profile._json.locale))
+        // @ts-expect-error: purposefully inspect at runtime
         user.locale = profile.locale || profile._json.locale;
 
       await this.users.replaceOne({ _id: user._id }, user);
     } else {
       // Create new user
 
-      user = await this.createUser((user) => {
+      user = await this.createUser((user: Partial<DbaUser>) => {
+        if (!user.services) user.services = [];
         user.services.push({ service, id, profile, accessToken, refreshToken });
 
         user.displayName = profile.displayName;
         user.name = profile.name;
         user.emails = profile.emails;
-        user.photos = profile.photos;
-        user.photos.forEach((photo) => (photo.provider = profile.provider));
+        if (profile.photos)
+          user.photos = profile.photos.map((photo) => ({
+            ...photo,
+            provider: profile.provider,
+          }));
 
+        // @ts-expect-error: purposefully inspect at runtime
         if (profile.gender || profile._json.gender)
+          // @ts-expect-error: purposefully inspect at runtime
           user.gender = profile.gender || profile._json.gender;
 
+        // @ts-expect-error: purposefully inspect at runtime
         if (profile.locale || profile._json.locale)
+          // @ts-expect-error: purposefully inspect at runtime
           user.locale = profile.locale || profile._json.locale;
       });
     }
