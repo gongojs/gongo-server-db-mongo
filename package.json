@@ -1,6 +1,6 @@
 {
   "name": "gongo-server-db-mongo",
-  "version": "0.0.5",
+  "version": "2.0.0",
   "author": "Gadi Cohen <dragon@wastelands.net>",
   "description": "MongoDB support for GongoJS gongo-server",
   "license": "MIT",
@@ -36,7 +36,7 @@
     "coverage": "jest src --coverage",
     "prettier": "prettier -w src",
     "build": "tsc",
-    "prepublish": "build"
+    "prepublishOnly": "build"
   },
   "dependencies": {
     "jsonpatch-to-mongodb": "0.1.1",
