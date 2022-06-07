@@ -22,10 +22,10 @@
     "@types/jest": "^28.1.0",
     "@typescript-eslint/eslint-plugin": "^5.27.0",
     "@typescript-eslint/parser": "^5.27.0",
-    "eslint": "^8.16.0",
+    "eslint": "^8.17.0",
     "eslint-config-prettier": "^8.5.0",
-    "jest": "^28.1.0",
-    "mongo-mock": "^4.0.0",
+    "jest": "^28.1.1",
+    "mongo-mock": "^4.1.0",
     "prettier": "^2.6.2",
     "ts-jest": "^28.0.4",
     "typescript": "^4.7.2"
@@ -43,6 +43,6 @@
     "mongodb": "^4.6.0"
   },
   "peerDependencies": {
-    "gongo-server": "^0.1.1"
+    "gongo-server": "^2.0.0"
   }
 }
