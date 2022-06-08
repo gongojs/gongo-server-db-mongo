@@ -32,8 +32,8 @@
   },
   "scripts": {
     "lint": "eslint src",
-    "test": "jest src",
-    "coverage": "jest src --coverage",
+    "test": "jest",
+    "coverage": "jest --coverage",
     "prettier": "prettier -w src",
     "build": "tsc",
     "prepublishOnly": "build"

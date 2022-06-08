@@ -5,19 +5,19 @@ import type { ChangeSet } from "gongo-server/lib/DatabaseAdapter.js";
 import type GongoServerless from "gongo-server/lib/serverless.js";
 import type {
   PublicationProps,
-  PublicationResults,
+  PublicationResult,
 } from "gongo-server/lib/publications.js";
 
 import Cursor from "./cursor";
 import Collection from "./collection";
 import Users from "./users";
 
-class MongoDatabaseAdapter implements DatabaseAdapter {
+class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
   client: _MongoClient;
   dbPromise: Promise<Db>;
   collections: Record<string, Collection>;
   Users: Users;
-  gs?: GongoServerless<this>;
+  gs?: GongoServerless<MongoDatabaseAdapter>;
 
   constructor(url: string, dbName = "gongo", MongoClient = _MongoClient) {
     const client = (this.client = new MongoClient(url));
@@ -33,7 +33,7 @@ class MongoDatabaseAdapter implements DatabaseAdapter {
     this.Users = new Users(this);
   }
 
-  onInit(gs: GongoServerless<this>) {
+  onInit(gs: GongoServerless<MongoDatabaseAdapter>) {
     const ARSON = gs.ARSON;
     this.gs = gs;
 
@@ -91,8 +91,8 @@ class MongoDatabaseAdapter implements DatabaseAdapter {
   }
 
   async publishHelper(
-    publishResult: Cursor | PublicationResults,
-    { updatedAt }: PublicationProps<this>
+    publishResult: Cursor | PublicationResult,
+    { updatedAt }: PublicationProps<MongoDatabaseAdapter>
   ) {
     if (publishResult instanceof Cursor) {
       const collName = publishResult.coll.name;
@@ -100,9 +100,9 @@ class MongoDatabaseAdapter implements DatabaseAdapter {
       if (updatedAt && updatedAt[collName])
         publishResult.filter.__updatedAt = { $gt: updatedAt[collName] };
 
-      const helpedResult: PublicationResults = {};
+      const helpedResult: PublicationResult = [];
       const entries = await publishResult.toArray();
-      if (entries.length) helpedResult.results = [{ coll: collName, entries }];
+      if (entries.length) helpedResult.push({ coll: collName, entries });
       return helpedResult;
 
       /*

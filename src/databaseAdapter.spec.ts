@@ -7,7 +7,10 @@ import Users from "./users";
 import type Collection from "./collection";
 import type Cursor from "./cursor";
 import type GongoServerless from "gongo-server/lib/serverless.js";
-import type { PublicationProps } from "gongo-server/lib/publications.js";
+import type {
+  PublicationProps,
+  PublicationResult,
+} from "gongo-server/lib/publications.js";
 
 const mongoUrl = "mongodb://localhost:27017/gongoTest";
 
@@ -141,19 +144,14 @@ describe("MongoDBA", () => {
       } as unknown as PublicationProps<MongoDBA>;
 
       // results = { results: [ { coll: 'test', entries: [ [Object], [Object] ] } ] }
-      const pubResult = await dba.publishHelper(cursor, pubPropsStub);
+      const results = await dba.publishHelper(cursor, pubPropsStub);
 
       expect(cursor.filter.__updatedAt).toEqual({ $gt: updatedAt.test });
 
-      expect(typeof pubResult).toBe("object");
-      const results = pubResult.results;
-
       expect(results).toBeDefined();
       expect(Array.isArray(results)).toBe(true);
-      // @ts-expect-error: asserted above
       expect(results.length).toBe(1);
 
-      // @ts-expect-error: asserted above
       const test = results[0];
       expect(test.coll).toBe("test");
       expect(test.entries.length).toBe(2);
@@ -197,11 +195,10 @@ describe("MongoDBA", () => {
     it("returns same value for non-cursors", async () => {
       const dba = new MongoDBA(mongoUrl, "gongo", FakeMongoClient);
 
-      const obj = {};
-      const arr = [];
+      const result = [] as PublicationResult;
       const pubProps = {} as unknown as PublicationProps<MongoDBA>;
 
-      expect(await dba.publishHelper(obj, pubProps)).toBe(obj);
+      expect(await dba.publishHelper(result, pubProps)).toBe(result);
       // if not a cursor, it should always be a doc.
       // expect(await dba.publishHelper(arr)).toBe(arr);
       // expect(await dba.publishHelper(1)).toBe(1);
