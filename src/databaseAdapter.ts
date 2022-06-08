@@ -17,7 +17,7 @@ class MongoDatabaseAdapter implements DatabaseAdapter {
   dbPromise: Promise<Db>;
   collections: Record<string, Collection>;
   Users: Users;
-  gs?: GongoServerless;
+  gs?: GongoServerless<this>;
 
   constructor(url: string, dbName = "gongo", MongoClient = _MongoClient) {
     const client = (this.client = new MongoClient(url));
@@ -33,7 +33,7 @@ class MongoDatabaseAdapter implements DatabaseAdapter {
     this.Users = new Users(this);
   }
 
-  onInit(gs: GongoServerless) {
+  onInit(gs: GongoServerless<this>) {
     const ARSON = gs.ARSON;
     this.gs = gs;
 
@@ -92,7 +92,7 @@ class MongoDatabaseAdapter implements DatabaseAdapter {
 
   async publishHelper(
     publishResult: Cursor | PublicationResults,
-    { updatedAt }: PublicationProps
+    { updatedAt }: PublicationProps<this>
   ) {
     if (publishResult instanceof Cursor) {
       const collName = publishResult.coll.name;
