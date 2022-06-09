@@ -1,7 +1,9 @@
 // https://github.com/mongodb-js/jsonpatch-to-mongodb
 // modded to address https://github.com/mongodb-js/jsonpatch-to-mongodb/issues/6
-// differently.
+// differently, and use $pull instead of $unset for array elements.
 /* istanbul ignore file */
+
+const pointer = require("json-pointer");
 
 function toDot(path) {
   return path
@@ -11,8 +13,9 @@ function toDot(path) {
     .replace(/~0/g, "~");
 }
 
-module.exports = function (patches) {
+module.exports = function (patches, source) {
   var update = {};
+  let parentPath; // gongo
   patches.map(function (p) {
     switch (p.op) {
       case "add":
@@ -81,8 +84,31 @@ module.exports = function (patches) {
         }
         break;
       case "remove":
-        update.$unset = update.$unset || {};
-        update.$unset[toDot(p.path)] = 1;
+        // gongo mod
+        parentPath = p.path.replace(/\/[0-9]+$/, "");
+        if (source && Array.isArray(pointer.get(source, parentPath))) {
+          const pos = parseInt(p.path.substr(parentPath.length + 1));
+          const $parentPath = "$" + toDot(parentPath);
+
+          // https://jira.mongodb.org/browse/SERVER-1014
+          update.$set = update.$set || {};
+          update.$set[toDot(parentPath)] = {
+            $concatArrays: [
+              { $slice: [$parentPath, pos] },
+              {
+                $slice: [
+                  $parentPath,
+                  { $add: [1, pos] },
+                  { $size: $parentPath },
+                ],
+              },
+            ],
+          };
+        } else {
+          // original case
+          update.$unset = update.$unset || {};
+          update.$unset[toDot(p.path)] = 1;
+        }
         break;
       case "replace":
         update.$set = update.$set || {};
@@ -94,5 +120,7 @@ module.exports = function (patches) {
         throw new Error("Unsupported Operation! op = " + p.op);
     }
   });
-  return update;
+  //return update;
+  // gongo, uses aggregrate pipline
+  return [update];
 };
