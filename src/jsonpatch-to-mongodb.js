@@ -1,6 +1,6 @@
 // https://github.com/mongodb-js/jsonpatch-to-mongodb
 // modded to address https://github.com/mongodb-js/jsonpatch-to-mongodb/issues/6
-//   differently.
+// differently.
 /* istanbul ignore file */
 
 function toDot(path) {

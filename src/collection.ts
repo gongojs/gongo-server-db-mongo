@@ -1,4 +1,4 @@
-//const toMongoDb = require('jsonpatch-to-mongodb');
+//const toMongoDb = require("jsonpatch-to-mongodb");
 const toMongoDb = require("./jsonpatch-to-mongodb");
 import Cursor from "./cursor";
 import type DatabaseAdapter from "./databaseAdapter.js";
