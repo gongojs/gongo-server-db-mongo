@@ -11,6 +11,10 @@ import type {
   UpdateOptions,
 } from "mongodb";
 
+// https://stackoverflow.com/a/51399781/1839099
+type ArrayElement<ArrayType extends readonly unknown[]> =
+  ArrayType extends readonly (infer ElementType)[] ? ElementType : never;
+
 export default class Collection {
   db: DatabaseAdapter;
   name: string;
@@ -177,7 +181,8 @@ export default class Collection {
 
   async applyPatch(entry: ChangeSetUpdate) {
     const _id = entry._id;
-    const update = toMongoDb(entry.patch) as UpdateFilter<Document>;
+    const orig = await this.findOne({ _id });
+    const update = toMongoDb(entry.patch, orig) as UpdateFilter<Document>;
 
     /*
     updateOne does this already.
@@ -191,14 +196,25 @@ export default class Collection {
 
   async applyPatches(entries: Array<ChangeSetUpdate>) {
     const realColl = await this.getReal();
+
+    const ids = entries.map((doc) => doc._id);
+    const origResult = await this.find({ _id: { $in: ids } }).toArray();
+    const origDocs: Record<string, ArrayElement<typeof origResult>> = {};
+    for (const doc of origResult) {
+      origDocs[doc._id.toString()] = doc;
+    }
+
     const bulk = [];
 
-    for (const entry of entries) {
+    //for (const entry of entries) {
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      const orig = origDocs[entry._id.toString()];
       console.log("patch", entry.patch);
-      const update = toMongoDb(entry.patch);
-      console.log("update", update);
-      if (!update.$set) update.$set = {};
-      update.$set.__updatedAt = Date.now();
+      const update = toMongoDb(entry.patch, orig);
+      console.log("update", update, orig);
+      if (!update[0].$set) update[0].$set = {};
+      update[0].$set.__updatedAt = Date.now();
 
       bulk.push({
         updateOne: {
