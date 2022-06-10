@@ -114,16 +114,20 @@ export default class Collection {
     console.log(this.name + " insertMany: " + JSON.stringify(docArray));
     //return await realColl.insertMany(docArray, { ordered: false /* XXX TODO */ });
 
+    /*
     const bwArg = docArray.map((doc) => ({
       replaceOne: {
         filter: { _id: doc._id },
         // update: { $setOnInsert: doc },
         replacement: doc,
-        upsert: true /* XXX TODO */,
+        upsert: true /* XXX TODO */ /*,
       },
     }));
 
-    await realColl.bulkWrite(bwArg);
+    return await realColl.bulkWrite(bwArg);
+    */
+
+    return await realColl.insertMany(docArray);
   }
 
   async markAsDeleted(idArray: Array<string>) {
@@ -131,7 +135,7 @@ export default class Collection {
     console.log(this.name + " markAsDeleted: " + idArray.join(","));
 
     const now = Date.now();
-    await realColl.bulkWrite(
+    return await realColl.bulkWrite(
       idArray.map((id) => ({
         replaceOne: {
           filter: { _id: id },
@@ -182,7 +186,7 @@ export default class Collection {
     */
 
     console.log("patch", entry, update);
-    await this.updateOne({ _id }, update);
+    return await this.updateOne({ _id }, update);
   }
 
   async applyPatches(entries: Array<ChangeSetUpdate>) {
@@ -205,6 +209,6 @@ export default class Collection {
     }
 
     console.log(JSON.stringify(bulk, null, 2));
-    await realColl.bulkWrite(bulk);
+    return await realColl.bulkWrite(bulk);
   }
 }

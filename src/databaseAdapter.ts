@@ -1,7 +1,11 @@
-import { MongoClient as _MongoClient, ObjectId } from "mongodb";
+import { MongoClient as _MongoClient, ObjectId, Document } from "mongodb";
 import type { Db } from "mongodb";
 import type DatabaseAdapter from "gongo-server/lib/DatabaseAdapter.js";
-import type { ChangeSet } from "gongo-server/lib/DatabaseAdapter.js";
+import type {
+  ChangeSet,
+  ChangeSetUpdate,
+  OpError,
+} from "gongo-server/lib/DatabaseAdapter.js";
 import type GongoServerless from "gongo-server/lib/serverless.js";
 import type {
   PublicationProps,
@@ -71,6 +75,39 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
       this.collections[name] = new Collection(this, name);
 
     return this.collections[name];
+  }
+
+  async insert(
+    collName: string,
+    entries: Array<Record<string, unknown>>
+  ): Promise<Array<OpError>> {
+    const coll = this.collection(collName);
+
+    try {
+      const result = await coll.insertMany(entries as Document[]);
+      if (!result.acknowledged) throw new Error("not acknolwedged");
+      if (result.insertedCount !== entries.length)
+        throw new Error("length mismatch");
+    } catch (error) {
+      // TODO, run them one by one.
+      console.error("TODO skipping insertMany error", error);
+    }
+    return [];
+  }
+
+  async update(
+    collName: string,
+    updates: Array<ChangeSetUpdate>
+  ): Promise<Array<OpError>> {
+    const coll = this.collection(collName);
+    await coll.applyPatches(updates);
+    return [];
+  }
+
+  async remove(collName: string, ids: Array<string>): Promise<Array<OpError>> {
+    const coll = this.collection(collName);
+    await coll.markAsDeleted(ids);
+    return [];
   }
 
   async processChangeSet(changeSet: ChangeSet) {
