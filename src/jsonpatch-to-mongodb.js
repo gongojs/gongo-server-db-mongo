@@ -15,7 +15,7 @@ function toDot(path) {
 
 module.exports = function (patches, source) {
   var update = {};
-  let parentPath; // gongo
+  let parentPath, parentValue; // gongo
   patches.map(function (p) {
     switch (p.op) {
       case "add":
@@ -86,11 +86,19 @@ module.exports = function (patches, source) {
       case "remove":
         // gongo mod
         parentPath = p.path.replace(/\/[0-9]+$/, "");
-        if (source && Array.isArray(pointer.get(source, parentPath))) {
+        parentValue = pointer.get(source, parentPath);
+        if (source && Array.isArray(parentValue)) {
           const pos = parseInt(p.path.substr(parentPath.length + 1));
-          const $parentPath = "$" + toDot(parentPath);
+          update.$set = update.$set || {};
+          update.$set[toDot(parentPath)] = parentValue;
+          parentValue.splice(pos, 1);
+
+          //const $parentPath = "$" + toDot(parentPath);
 
           // https://jira.mongodb.org/browse/SERVER-1014
+          // but requires aggregration pipeline, breaks $set for other things
+          // i.e. $set: { "products.0.qty": 2 } => { products: [ 0: { qty: 2 }, qty: 1 ]}
+          /*
           update.$set = update.$set || {};
           update.$set[toDot(parentPath)] = {
             $concatArrays: [
@@ -104,6 +112,7 @@ module.exports = function (patches, source) {
               },
             ],
           };
+          */
         } else {
           // original case
           update.$unset = update.$unset || {};
@@ -120,7 +129,5 @@ module.exports = function (patches, source) {
         throw new Error("Unsupported Operation! op = " + p.op);
     }
   });
-  //return update;
-  // gongo, uses aggregrate pipline
-  return [update];
+  return update;
 };

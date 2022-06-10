@@ -213,8 +213,8 @@ export default class Collection {
       console.log("patch", entry.patch);
       const update = toMongoDb(entry.patch, orig);
       console.log("update", update, orig);
-      if (!update[0].$set) update[0].$set = {};
-      update[0].$set.__updatedAt = Date.now();
+      if (!update.$set) update[0].$set = {};
+      update.$set.__updatedAt = Date.now();
 
       bulk.push({
         updateOne: {
