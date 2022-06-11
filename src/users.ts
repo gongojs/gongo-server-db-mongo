@@ -15,6 +15,7 @@ import type {
 } from "mongodb";
 
 import type DatabaseAdapter from "./databaseAdapter.js";
+import type { MongoDbaUser } from "./databaseAdapter.js";
 import type Collection from "./collection.js";
 
 export default class Users implements DbaUsers {
@@ -78,9 +79,9 @@ export default class Users implements DbaUsers {
   */
 
   async createUser(
-    callback?: (dbaUser: Partial<DbaUser>) => void
-  ): Promise<DbaUser> {
-    const user: Partial<DbaUser> = {
+    callback?: (dbaUser: Partial<MongoDbaUser>) => void
+  ): Promise<MongoDbaUser> {
+    const user: Partial<MongoDbaUser> = {
       emails: [],
       services: [],
     };
@@ -90,7 +91,7 @@ export default class Users implements DbaUsers {
     const result = await this.users.insertOne(user);
     if (result.acknowledged && result.insertedId instanceof ObjectId) {
       user._id = result.insertedId;
-      return user as DbaUser;
+      return user as MongoDbaUser;
     } else {
       throw new Error(
         "Unexpected mongo result in createUser():" + JSON.stringify(result)
@@ -106,7 +107,7 @@ export default class Users implements DbaUsers {
     profile: Profile,
     accessToken: string,
     refreshToken: string
-  ): Promise<DbaUser> {
+  ): Promise<MongoDbaUser> {
     const filter: Filter<Document> = { $or: [] };
     if (email) {
       if (typeof email === "string") {
@@ -129,7 +130,7 @@ export default class Users implements DbaUsers {
         $and: [{ "services.service": service }, { "services.id": id }],
       });
 
-    let user = (await this.users.findOne(filter)) as DbaUser | null;
+    let user = (await this.users.findOne(filter)) as MongoDbaUser | null;
 
     if (user) {
       // Update service info & add any missing fields
@@ -176,7 +177,7 @@ export default class Users implements DbaUsers {
     } else {
       // Create new user
 
-      user = await this.createUser((user: Partial<DbaUser>) => {
+      user = await this.createUser((user: Partial<MongoDbaUser>) => {
         if (!user.services) user.services = [];
         user.services.push({ service, id, profile, accessToken, refreshToken });
 

@@ -5,6 +5,7 @@ import type {
   ChangeSet,
   ChangeSetUpdate,
   OpError,
+  DbaUser,
 } from "gongo-server/lib/DatabaseAdapter.js";
 import type GongoServerless from "gongo-server/lib/serverless.js";
 import type {
@@ -15,6 +16,10 @@ import type {
 import Cursor from "./cursor";
 import Collection from "./collection";
 import Users from "./users";
+
+export interface MongoDbaUser extends DbaUser {
+  _id: ObjectId;
+}
 
 class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
   client: _MongoClient;
