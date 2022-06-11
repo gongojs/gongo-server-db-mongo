@@ -90,7 +90,7 @@ export default class Collection {
 
   async findOne(filter: Filter<Document>) {
     const realColl = await this.getReal();
-    return /* await */ realColl.findOne(filter);
+    return await realColl.findOne(filter);
   }
 
   async insertOne(doc: Document) {
@@ -213,7 +213,7 @@ export default class Collection {
       console.log("patch", entry.patch);
       const update = toMongoDb(entry.patch, orig);
       console.log("update", update, orig);
-      if (!update.$set) update[0].$set = {};
+      if (!update.$set) update.$set = {};
       update.$set.__updatedAt = Date.now();
 
       bulk.push({
