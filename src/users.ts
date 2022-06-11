@@ -39,10 +39,7 @@ export default class Users implements DbaUsers {
   }
 
   async getSessionData(sid: string) {
-    return (await this.sessions.findOne({ _id: sid })) as Record<
-      string,
-      unknown
-    >;
+    return await this.sessions.findOne({ _id: sid });
   }
 
   async getUserWithEmailAndPassword(email: string, password: string) {
