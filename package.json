@@ -36,7 +36,7 @@
     "coverage": "jest --coverage",
     "prettier": "prettier -w src",
     "build": "tsc",
-    "prepublishOnly": "build"
+    "prepublishOnly": "yarn run build"
   },
   "dependencies": {
     "json-pointer": "^0.6.2",
