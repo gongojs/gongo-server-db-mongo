@@ -10,60 +10,92 @@ import type {
   UpdateFilter,
   UpdateOptions,
 } from "mongodb";
+import type { MethodProps } from "gongo-server";
 
 // https://stackoverflow.com/a/51399781/1839099
 type ArrayElement<ArrayType extends readonly unknown[]> =
   ArrayType extends readonly (infer ElementType)[] ? ElementType : never;
 
+export interface CollectionEventProps extends MethodProps<DatabaseAdapter> {
+  collection: Collection;
+  eventName: string;
+}
+
+/*
+type AllowInsertHandler = (
+  doc: Document,
+  props: CollectionEventProps
+) => boolean;
+type AllowUpdateHandler = (
+  update: ChangeSetUpdate,
+  props: CollectionEventProps
+) => boolean;
+type AllowRemoveHandler = (id: string, props: CollectionEventProps) => boolean;
+type AllowHandler =
+  | AllowInsertHandler
+  | AllowUpdateHandler
+  | AllowRemoveHandler;
+*/
+
+type EventFunction = (
+  props: CollectionEventProps,
+  args?: Record<string, unknown>
+) => void;
+
+type EventName = "preInsertMany" | "postInsertMany";
+
 export default class Collection {
   db: DatabaseAdapter;
   name: string;
   _indexCreated: boolean;
-  allows: Record<string, unknown>;
+  // _allows: Record<string, false | AllowHandler>;
+  _events: Record<EventName, Array<EventFunction>>;
 
   constructor(db: DatabaseAdapter, name: string) {
     this.db = db;
     this.name = name;
     this._indexCreated = false;
-    this.allows = { insert: false, update: false, delete: false };
+    // this._allows = { insert: false, update: false, delete: false };
     // https://github.com/Meteor-Community-Packages/meteor-collection-hooks TODO
     // this.before = { insertOne: [] };
+    this._events = { preInsertMany: [], postInsertMany: [] };
   }
 
   /*
-  allow(operationName: string, func) {
+  allow(operationName: string, func: AllowHandler) {
     if (
       !Object.prototype.hasOwnProperty.call(
-        this.allows.hasOwnProperty,
+        this._allows.hasOwnProperty,
         operationName
       )
     )
       throw new Error(
         `No such operation "${operationName}", should be one of: ` +
-          Object.keys(this.allows).join(", ")
+          Object.keys(this._allows).join(", ")
       );
 
-    if (this.allows[operationName])
+    if (this._allows[operationName])
       throw new Error(`Operation "${operationName}" is already set`);
 
-    this.allows[operationName] = func;
+    this._allows[operationName] = func;
   }
   */
 
-  /*
-  on(eventName, func) {
-    if (this.events[eventName]) this.events[eventName].push(func);
+  on(eventName: EventName, func: EventFunction) {
+    if (this._events[eventName]) this._events[eventName].push(func);
     else throw new Error("No such event: " + eventName);
   }
-  */
 
-  /*
-  eventExec(eventName, args) {
-    if (!this.events[eventName]) throw new Error("No such event: " + eventName);
+  eventExec(
+    eventName: EventName,
+    props: CollectionEventProps,
+    args?: Record<string, unknown>
+  ) {
+    if (!this._events[eventName])
+      throw new Error("No such event: " + eventName);
 
-    for (let func of this.events[eventName]) func.call(this, args);
+    for (const func of this._events[eventName]) func.call(this, props, args);
   }
-  */
 
   async getReal() {
     const db = await this.db.dbPromise;
@@ -140,6 +172,7 @@ export default class Collection {
 
     const now = Date.now();
     return await realColl.bulkWrite(
+      /// XXX XXX XXX does this even work?  need ObjectId(id)
       idArray.map((id) => ({
         replaceOne: {
           filter: { _id: id },

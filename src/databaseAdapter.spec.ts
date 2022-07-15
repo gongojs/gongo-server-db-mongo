@@ -1,10 +1,10 @@
 import { jest } from "@jest/globals";
 import { ObjectId } from "mongodb";
-import type { MongoClient } from "mongodb";
+import type { MongoClient, Document } from "mongodb";
 
 import MongoDBA from "./databaseAdapter";
 import Users from "./users";
-import type Collection from "./collection";
+// import type Collection from "./collection";
 import type Cursor from "./cursor";
 import type GongoServerless from "gongo-server/lib/serverless.js";
 import type {
@@ -80,6 +80,7 @@ describe("MongoDBA", () => {
     });
   });
 
+  /*
   describe("processChangeSet", () => {
     it("map correct funcs", async () => {
       const dba = new MongoDBA(mongoUrl, "gongo", FakeMongoClient);
@@ -89,7 +90,7 @@ describe("MongoDBA", () => {
       const insertManyRV = {},
         applyPatchesRV = {},
         markAsDeletedRV = {};
-      */
+      */ /*
       coll.insertMany = jest.fn<typeof Collection.prototype.insertMany>();
       //.mockReturnValueOnce(Promise.resolve(insertManyRV));
       coll.applyPatches = jest.fn<typeof Collection.prototype.applyPatches>();
@@ -105,7 +106,7 @@ describe("MongoDBA", () => {
         },
       };
 
-      /* const result = */ await dba.processChangeSet(changeSet);
+      /* const result = */ /* await dba.processChangeSet(changeSet);
 
       expect(coll.insertMany).toHaveBeenCalledWith(changeSet.test.insert);
       expect(coll.applyPatches).toHaveBeenCalledWith(changeSet.test.update);
@@ -125,7 +126,8 @@ describe("MongoDBA", () => {
       expect(coll.applyPatches).not.toHaveBeenCalled();
       expect(coll.markAsDeleted).not.toHaveBeenCalled();
     });
-  }); /* procesChangeSet */
+  }); /* procesChangeSet */ /*
+   */
 
   describe("publishHelper", () => {
     it("appends updatedAt, returns toArray results in correct format", async () => {
@@ -205,4 +207,84 @@ describe("MongoDBA", () => {
       // expect(await dba.publishHelper("str")).toBe("str");
     });
   }); /* procesChangeSet */
+
+  describe("crud", () => {
+    describe("insert", () => {
+      it("calls coll's insertMany", async () => {
+        const dba = new MongoDBA(mongoUrl, "gongo", FakeMongoClient);
+        const insertMany = jest.fn();
+        // @ts-expect-error: stub
+        dba.collection("test").insertMany = insertMany;
+
+        // @ts-expect-error: stub
+        await dba.insert("test", [{ _id: "a" }, { _id: "b" }]);
+
+        expect(insertMany).toHaveBeenCalledWith([{ _id: "a" }, { _id: "b" }]);
+      });
+
+      describe("hooks", () => {
+        describe("preInsertMany", () => {
+          it("runs and handles errors", async () => {
+            const dba = new MongoDBA(mongoUrl, "gongo", FakeMongoClient);
+            const testCol = dba.collection("test");
+
+            testCol.on("preInsertMany", (props, args) => {
+              const entries = args?.entries as Document[];
+              for (const doc of entries) {
+                if (doc._id == "a") {
+                  doc.$error = { id: doc._id, error: "some error" };
+                  delete doc._id;
+                }
+              }
+            });
+
+            const insertMany = jest.fn();
+            // @ts-expect-error: stub
+            testCol.insertMany = insertMany;
+
+            // @ts-expect-error: stub
+            const errors = await dba.insert("test", [
+              { _id: "a" },
+              { _id: "b" },
+            ]);
+
+            expect(errors.length).toBe(1);
+            expect(errors[0][0]).toBe("a");
+            expect(errors[0][1]).toBe("some error");
+
+            expect(insertMany).toHaveBeenCalledWith([{ _id: "b" }]);
+          });
+        });
+      });
+
+      describe("postInsertMany", () => {
+        it("runs after insertMany with only inserted entries", async () => {
+          const dba = new MongoDBA(mongoUrl, "gongo", FakeMongoClient);
+          const testCol = dba.collection("test");
+
+          testCol.on("preInsertMany", (props, args) => {
+            const entries = args?.entries as Document[];
+            for (const doc of entries) {
+              if (doc._id == "a") {
+                doc.$error = { id: doc._id, error: "some error" };
+                delete doc._id;
+              }
+            }
+          });
+
+          const postInsertMany = jest.fn();
+          testCol.on("postInsertMany", postInsertMany);
+
+          // @ts-expect-error: stub
+          testCol.insertMany = jest.fn();
+
+          // @ts-expect-error: stub
+          await dba.insert("test", [{ _id: "a" }, { _id: "b" }]);
+
+          const { entries } = postInsertMany.mock.calls[0][1];
+          expect(entries).toStrictEqual([{ _id: "b" }]);
+        });
+      });
+    });
+  });
 });

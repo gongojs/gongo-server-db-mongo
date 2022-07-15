@@ -1,8 +1,13 @@
-import { MongoClient as _MongoClient, ObjectId, Document } from "mongodb";
+import {
+  MongoClient as _MongoClient,
+  ObjectId,
+  Document,
+  MongoBulkWriteError,
+  WriteError,
+} from "mongodb";
 import type { Db } from "mongodb";
 import type DatabaseAdapter from "gongo-server/lib/DatabaseAdapter.js";
 import type {
-  ChangeSet,
   ChangeSetUpdate,
   OpError,
   DbaUser,
@@ -12,10 +17,12 @@ import type {
   PublicationProps,
   PublicationResult,
 } from "gongo-server/lib/publications.js";
+import type { MethodProps } from "gongo-server";
 
 import Cursor from "./cursor";
 import Collection from "./collection";
 import Users from "./users";
+import type { CollectionEventProps } from "./collection";
 
 export interface MongoDbaUser extends DbaUser {
   _id: ObjectId;
@@ -84,37 +91,95 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
 
   async insert(
     collName: string,
-    entries: Array<Record<string, unknown>>
+    entries: Array<Record<string, unknown>>,
+    _props: MethodProps<MongoDatabaseAdapter>
   ): Promise<Array<OpError>> {
     const coll = this.collection(collName);
 
+    const preInsertManyProps: CollectionEventProps = {
+      collection: coll,
+      eventName: "preInsertMany",
+      ..._props,
+    };
+    coll.eventExec("preInsertMany", preInsertManyProps, { entries });
+
+    const toInsert: Document[] = [];
+    const errors: OpError[] = [];
+    for (const entry of entries) {
+      if (Object.keys(entry).length === 1 && entry.$error) {
+        // @ts-expect-error: TODO XXX
+        errors.push([entry.$error.id, entry.$error.error]);
+      } else {
+        toInsert.push(entry);
+      }
+    }
+
     try {
-      const result = await coll.insertMany(entries as Document[]);
+      const result = await coll.insertMany(toInsert);
       if (!result.acknowledged) throw new Error("not acknolwedged");
       if (result.insertedCount !== entries.length)
         throw new Error("length mismatch");
     } catch (error) {
-      // TODO, run them one by one.
-      console.error("TODO skipping insertMany error", error);
+      if (error instanceof MongoBulkWriteError) {
+        error.writeErrors;
+        for (const writeError of error.writeErrors as Array<WriteError>) {
+          // TODO, log full error on server?
+          // TODO, "as string"... think more about types... objectid?  in code elsewhere
+          // TODO, not tested yet!
+          // TODO, should skip these on postInsertMany hook too!
+          errors.push([
+            toInsert[writeError.index]._id as string,
+            writeError.errmsg,
+          ]);
+        }
+      } else {
+        // TODO, run them one by one.  XXX
+        console.error("TODO skipping insertMany error", error);
+      }
     }
-    return [];
+
+    const postInsertManyProps: CollectionEventProps = {
+      collection: coll,
+      eventName: "postInsertMany",
+      ..._props,
+    }; // TODO skip non-inserted from mongo above
+    coll.eventExec("postInsertMany", preInsertManyProps, { entries: toInsert });
+
+    return errors;
   }
 
   async update(
     collName: string,
-    updates: Array<ChangeSetUpdate>
+    updates: Array<ChangeSetUpdate>,
+    _props: MethodProps<MongoDatabaseAdapter>
   ): Promise<Array<OpError>> {
     const coll = this.collection(collName);
+    const props: CollectionEventProps = {
+      collection: coll,
+      eventName: "update",
+      ..._props,
+    };
     await coll.applyPatches(updates);
     return [];
   }
 
-  async remove(collName: string, ids: Array<string>): Promise<Array<OpError>> {
+  async remove(
+    collName: string,
+    ids: Array<string>,
+    _props: MethodProps<MongoDatabaseAdapter>
+  ): Promise<Array<OpError>> {
     const coll = this.collection(collName);
+    const props: CollectionEventProps = {
+      collection: coll,
+      eventName: "remove",
+      ..._props,
+    };
+
     await coll.markAsDeleted(ids);
     return [];
   }
 
+  /*
   async processChangeSet(changeSet: ChangeSet) {
     for (const [collName, ops] of Object.entries(changeSet)) {
       const coll = this.collection(collName);
@@ -131,6 +196,7 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
     // TODO, { $errors }
     return {};
   }
+  */
 
   async publishHelper(
     publishResult: Cursor | PublicationResult,

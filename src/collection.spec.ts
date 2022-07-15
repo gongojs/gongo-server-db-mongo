@@ -459,4 +459,52 @@ describe("Collection", () => {
       ]);
     });
   });
+
+  describe("events", () => {
+    describe("on", () => {
+      it("set event", () => {
+        // @ts-expect-error: stub
+        const col = new Collection("db", "name");
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        const func = function () {};
+        col.on("preInsertMany", func);
+        expect(col._events.preInsertMany[0]).toBe(func);
+      });
+
+      it("throws on non-existent event name", () => {
+        // @ts-expect-error: stub
+        const col = new Collection("db", "name");
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        const func = function () {};
+        // @ts-expect-error: exactly what we're testing for
+        expect(() => col.on("DOES_NOT_EXIST", func)).toThrow(/No such event/);
+      });
+    });
+
+    describe("eventExec", () => {
+      it("runs event", () => {
+        // @ts-expect-error: stub
+        const col = new Collection("db", "name");
+        const func = jest.fn();
+        col.on("preInsertMany", func);
+        // @ts-expect-error: stub
+        col.eventExec("preInsertMany");
+        expect(func).toHaveBeenCalledTimes(1);
+      });
+
+      it("throws on no such event", () => {
+        // @ts-expect-error: stub
+        const col = new Collection("db", "name");
+        // @ts-expect-error: stub
+        const func = () => col.eventExec("DOES_NOT_EXIST");
+        expect(func).toThrow(/No such event/);
+      });
+    });
+  });
+
+  /*
+  describe("allows", () => {
+
+  });
+  */
 });
