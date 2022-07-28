@@ -281,6 +281,7 @@ describe("MongoDBA", () => {
           // @ts-expect-error: stub
           await dba.insert("test", [{ _id: "a" }, { _id: "b" }]);
 
+          // @ts-expect-error: TODO (fix unknown)
           const { entries } = postInsertMany.mock.calls[0][1];
           expect(entries).toStrictEqual([{ _id: "b" }]);
         });
