@@ -1,5 +1,6 @@
 import Collection from "./collection";
 import Cursor from "./cursor";
+import type { OpError } from "gongo-server/lib/DatabaseAdapter.js";
 
 const now = Date.now();
 const dateNowSpy = jest.spyOn(global.Date, "now");
@@ -502,9 +503,128 @@ describe("Collection", () => {
     });
   });
 
-  /*
   describe("allows", () => {
+    describe("insert", () => {
+      /*
+      it("blocks by default", async () => {
+        // @ts-expect-error: stub
+        const col = new Collection("db", "name");
+        // @ts-expect-error: stub
+        expect(() => col.allowFilter("insert", [], {})).toThrowError(
+          /has no allow handler/
+        );
+      });
+      */
+      it("blocks by default", async () => {
+        // @ts-expect-error: stub
+        const col = new Collection("db", "name");
+        const errors: Array<OpError> = [];
+        const docs = [{ _id: "a" }, { _id: "b" }];
+        // @ts-expect-error: stub
+        const filtered = await col.allowFilter("insert", docs, {}, errors);
 
+        expect(filtered).toHaveLength(0);
+        expect(errors).toHaveLength(2);
+        expect(errors[0]).toMatchObject(["a", 'No "insert" allow handler']);
+      });
+
+      it("allows only allowed inserts", async () => {
+        // @ts-expect-error: stub
+        const col = new Collection("db", "name");
+        col.allow("insert", async (doc /* _props */) => {
+          return !!doc.allowed;
+        });
+        const errors: OpError[] = [];
+        const docs = [{ notAllowed: true }, { allowed: true }];
+        // @ts-expect-error: stub
+        const filtered = await col.allowFilter("insert", docs, {}, errors);
+
+        expect(filtered.length).toBe(1);
+        expect(filtered[0]).toMatchObject({ allowed: true });
+      });
+    });
+
+    describe("update", () => {
+      /*
+      it("blocks by default", async () => {
+        // @ts-expect-error: stub
+        const col = new Collection("db", "name");
+        // @ts-expect-error: stub
+        expect(() => col.allowFilter("update", [], {})).toThrowError(
+          /has no allow handler/
+        );
+      });
+      */
+      it("blocks by default", async () => {
+        // @ts-expect-error: stub
+        const col = new Collection("db", "name");
+        const errors: Array<OpError> = [];
+        const docs = [{ _id: "a" }, { _id: "b" }];
+        // @ts-expect-error: stub
+        const filtered = await col.allowFilter("update", docs, {}, errors);
+
+        expect(filtered).toHaveLength(0);
+        expect(errors).toHaveLength(2);
+        expect(errors[0]).toMatchObject(["a", 'No "update" allow handler']);
+      });
+
+      it("allows only allowed updates", async () => {
+        // @ts-expect-error: stub
+        const col = new Collection("db", "name");
+        col.allow("update", async (changeSet /*, props */) => {
+          return changeSet._id === "stay";
+        });
+        const errors: OpError[] = [];
+        const docs = [
+          { _id: "stay", patch: [] },
+          { _id: "go", patch: [] },
+        ];
+        // @ts-expect-error: stub
+        const filtered = await col.allowFilter("update", docs, {}, errors);
+
+        expect(filtered.length).toBe(1);
+        expect(filtered[0]).toMatchObject({ _id: "stay" });
+      });
+    });
+
+    describe("remove", () => {
+      /*
+      it("blocks by default", async () => {
+        // @ts-expect-error: stub
+        const col = new Collection("db", "name");
+        // @ts-expect-error: stub
+        expect(() => col.allowFilter("remove", [], {})).toThrowError(
+          /has no allow handler/
+        );
+      });
+      */
+      it("blocks by default", async () => {
+        // @ts-expect-error: stub
+        const col = new Collection("db", "name");
+        const errors: Array<OpError> = [];
+        const docs = ["a", "b"];
+        // @ts-expect-error: stub
+        const filtered = await col.allowFilter("remove", docs, {}, errors);
+
+        expect(filtered).toHaveLength(0);
+        expect(errors).toHaveLength(2);
+        expect(errors[0]).toMatchObject(["a", 'No "remove" allow handler']);
+      });
+
+      it("allows only allowed removes", async () => {
+        // @ts-expect-error: stub
+        const col = new Collection("db", "name");
+        col.allow("remove", async (id /*, props */) => {
+          return id === "stay";
+        });
+        const errors: OpError[] = [];
+        const docIds = ["stay", "go"];
+        // @ts-expect-error: stub
+        const filtered = await col.allowFilter("remove", docIds, {}, errors);
+
+        expect(filtered.length).toBe(1);
+        expect(filtered[0]).toBe("stay");
+      });
+    });
   });
-  */
 });

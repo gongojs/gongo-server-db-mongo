@@ -11,6 +11,7 @@ import type {
   ChangeSetUpdate,
   OpError,
   DbaUser,
+  ChangeSet,
 } from "gongo-server/lib/DatabaseAdapter.js";
 import type GongoServerless from "gongo-server/lib/serverless.js";
 import type {
@@ -177,6 +178,65 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
 
     await coll.markAsDeleted(ids);
     return [];
+  }
+
+  async allowFilter(
+    collName: string,
+    operationName: "insert",
+    docs: Array<Record<string, unknown>>,
+    _props: MethodProps<MongoDatabaseAdapter>,
+    errors: Array<OpError>
+  ): Promise<Array<Record<string, unknown>>>;
+  async allowFilter(
+    collName: string,
+    operationName: "update",
+    docs: Array<ChangeSetUpdate>,
+    _props: MethodProps<MongoDatabaseAdapter>,
+    errors: Array<OpError>
+  ): Promise<Array<ChangeSetUpdate>>;
+  async allowFilter(
+    collName: string,
+    operationName: "remove",
+    docs: Array<string>,
+    _props: MethodProps<MongoDatabaseAdapter>,
+    errors: Array<OpError>
+  ): Promise<Array<string>>;
+  async allowFilter(
+    collName: string,
+    operationName: "insert" | "update" | "remove",
+    docs:
+      | Array<Record<string, unknown>>
+      | Array<ChangeSetUpdate>
+      | Array<string>,
+    _props: MethodProps<MongoDatabaseAdapter>,
+    errors: Array<OpError>
+  ): Promise<
+    Array<Record<string, unknown>> | Array<ChangeSetUpdate> | Array<string>
+  > {
+    const coll = this.collection(collName);
+    const props: CollectionEventProps = {
+      collection: coll,
+      eventName: "remove",
+      ..._props,
+    };
+
+    if (operationName === "insert")
+      return await coll.allowFilter(
+        "insert",
+        docs as Document[],
+        props,
+        errors
+      );
+    else if (operationName === "update")
+      return await coll.allowFilter(
+        "update",
+        docs as ChangeSetUpdate[],
+        props,
+        errors
+      );
+    // if (operationName === "remove")
+    else
+      return await coll.allowFilter("remove", docs as string[], props, errors);
   }
 
   /*

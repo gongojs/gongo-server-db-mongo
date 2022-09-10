@@ -11,6 +11,19 @@ import type {
   UpdateOptions,
 } from "mongodb";
 import type { MethodProps } from "gongo-server";
+import type { OpError } from "gongo-server/lib/DatabaseAdapter.js";
+
+// https://advancedweb.hu/how-to-use-async-functions-with-array-filter-in-javascript/
+// I added types.
+/*
+const asyncFilter = async <T>(
+  arr: T[],
+  predicate: (item: T) => Promise<boolean>
+) =>
+  Promise.all(arr.map(predicate)).then((results) =>
+    arr.filter((_v, index) => results[index])
+  );
+*/
 
 // https://stackoverflow.com/a/51399781/1839099
 type ArrayElement<ArrayType extends readonly unknown[]> =
@@ -21,53 +34,76 @@ export interface CollectionEventProps extends MethodProps<DatabaseAdapter> {
   eventName: string;
 }
 
-/*
-type AllowInsertHandler = (
+export type AllowInsertHandler = (
   doc: Document,
   props: CollectionEventProps
-) => boolean;
-type AllowUpdateHandler = (
+) => Promise<boolean | string>;
+export type AllowUpdateHandler = (
   update: ChangeSetUpdate,
   props: CollectionEventProps
-) => boolean;
-type AllowRemoveHandler = (id: string, props: CollectionEventProps) => boolean;
-type AllowHandler =
+) => Promise<boolean | string>;
+export type AllowRemoveHandler = (
+  id: string,
+  props: CollectionEventProps
+) => Promise<boolean | string>;
+export type AllowHandler =
   | AllowInsertHandler
   | AllowUpdateHandler
   | AllowRemoveHandler;
-*/
 
 type EventFunction = (
   props: CollectionEventProps,
   args?: Record<string, unknown>
 ) => void;
 
+type OperationName = "insert" | "update" | "remove";
+
+interface Allows {
+  insert: false | AllowInsertHandler;
+  update: false | AllowUpdateHandler;
+  remove: false | AllowRemoveHandler;
+}
+
 type EventName = "preInsertMany" | "postInsertMany";
+
+export async function userIsAdmin(
+  _doc: Document | ChangeSetUpdate | string,
+  { dba, auth }: CollectionEventProps
+) {
+  const userId = await auth.userId();
+  if (!userId) return "NOT_LOGGED_IN";
+
+  const user = await dba.collection("users").findOne({ _id: userId });
+  if (!user || !user.admin) return "NOT_ADMIN";
+
+  return true;
+}
 
 export default class Collection {
   db: DatabaseAdapter;
   name: string;
   _indexCreated: boolean;
-  // _allows: Record<string, false | AllowHandler>;
+  _allows: Allows;
   _events: Record<EventName, Array<EventFunction>>;
 
   constructor(db: DatabaseAdapter, name: string) {
     this.db = db;
     this.name = name;
     this._indexCreated = false;
-    // this._allows = { insert: false, update: false, delete: false };
+    this._allows = { insert: false, update: false, remove: false };
     // https://github.com/Meteor-Community-Packages/meteor-collection-hooks TODO
     // this.before = { insertOne: [] };
     this._events = { preInsertMany: [], postInsertMany: [] };
   }
 
-  /*
-  allow(operationName: string, func: AllowHandler) {
+  allow(operationName: "insert", func: AllowInsertHandler): void;
+  allow(operationName: "update", func: AllowUpdateHandler): void;
+  allow(operationName: "remove", func: AllowRemoveHandler): void;
+  allow(operationName: OperationName, func: AllowHandler) {
     if (
-      !Object.prototype.hasOwnProperty.call(
-        this._allows.hasOwnProperty,
-        operationName
-      )
+      operationName !== "insert" &&
+      operationName !== "update" &&
+      operationName !== "remove"
     )
       throw new Error(
         `No such operation "${operationName}", should be one of: ` +
@@ -77,9 +113,97 @@ export default class Collection {
     if (this._allows[operationName])
       throw new Error(`Operation "${operationName}" is already set`);
 
-    this._allows[operationName] = func;
+    if (operationName === "insert")
+      this._allows.insert = func as AllowInsertHandler;
+    else if (operationName === "update")
+      this._allows.update = func as AllowUpdateHandler;
+    else if (operationName === "remove")
+      this._allows.remove = func as AllowRemoveHandler;
+
+    // this._allows[operationName] = func;
   }
-  */
+
+  /**
+   * Called by gongo-server/crud to go through all requested changes
+   * and return valid docs for insert/update/remove.
+   * @param docs An array of docs
+   */
+  async allowFilter(
+    operationName: "insert",
+    docs: Array<Document>,
+    props: CollectionEventProps,
+    errors: Array<OpError>
+  ): Promise<Array<Document>>;
+  async allowFilter(
+    operationName: "update",
+    docs: Array<ChangeSetUpdate>,
+    props: CollectionEventProps,
+    errors: Array<OpError>
+  ): Promise<Array<Record<string, unknown>>>;
+  async allowFilter(
+    operationName: "remove",
+    docs: Array<string>,
+    props: CollectionEventProps,
+    errors: Array<OpError>
+  ): Promise<Array<string>>;
+  async allowFilter(
+    operationName: OperationName,
+    docs: Array<Document | ChangeSetUpdate | string>,
+    props: CollectionEventProps,
+    errors: Array<OpError>
+  ) {
+    const allowHandler = this._allows[operationName];
+
+    if (!allowHandler) {
+      errors.push(
+        ...docs.map((doc) => {
+          // @ts-expect-error: i hate you typescript
+          const id = operationName === "remove" ? doc : doc._id;
+          return [id, `No "${operationName}" allow handler`] as OpError;
+        })
+      );
+      return [];
+      /*
+      throw new Error(
+        `Collection "${this.name}" has no allow handler for operation "${operationName}"`
+      );
+      */
+    }
+
+    if (operationName === "insert") {
+      const filtered = [];
+      const insertAllowHandler = allowHandler as AllowInsertHandler;
+      for (const doc of docs) {
+        const result = await insertAllowHandler(doc as Document, props);
+        if (result === true) filtered.push(doc);
+        else errors.push([(doc as Document)._id, result]);
+      }
+      return filtered;
+    } else if (operationName === "update") {
+      const filtered = [];
+      const updateAllowHandler = allowHandler as AllowUpdateHandler;
+      for (const doc of docs) {
+        const result = await updateAllowHandler(doc as ChangeSetUpdate, props);
+        if (result === true) filtered.push(doc);
+        else errors.push([(doc as ChangeSetUpdate)._id, result]);
+      }
+      return filtered;
+    } else if (operationName === "remove") {
+      const filtered = [];
+      const removeAllowHandler = allowHandler as AllowRemoveHandler;
+      for (const id of docs) {
+        const result = await removeAllowHandler(id as string, props);
+        if (result === true) filtered.push(id);
+        else errors.push([id as string, result]);
+      }
+      return filtered;
+    } else {
+      throw new Error(
+        `Invalid operation name "${operationName}", ` +
+          'expected: "insert" | "update" | "remove".'
+      );
+    }
+  }
 
   on(eventName: EventName, func: EventFunction) {
     if (this._events[eventName]) this._events[eventName].push(func);
