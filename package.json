@@ -1,6 +1,6 @@
 {
   "name": "gongo-server-db-mongo",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "author": "Gadi Cohen <dragon@wastelands.net>",
   "description": "MongoDB support for GongoJS gongo-server",
   "license": "MIT",
