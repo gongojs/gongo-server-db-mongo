@@ -144,13 +144,12 @@ export default class Users implements DbaUsers {
 
       if (!user.name) user.name = profile.name;
 
-      // TODO, update "verified" field.
-      const emailsArray = profile.emails;
-      if (Array.isArray(emailsArray)) {
-        emailsArray.forEach((email) => {
-          if (!emailsArray.find((e) => e.value === email.value))
-            emailsArray.push(email);
-        });
+      if (!user.emails) user.emails = [];
+
+      // TODO, update "verified" field, make sure only one is "primary"
+      if (Array.isArray(profile.emails)) {
+        for (const email of profile.emails)
+          if (!user.emails.includes(email)) user.emails.push(email);
       }
 
       if (!user.photos) user.photos = [];
@@ -183,7 +182,7 @@ export default class Users implements DbaUsers {
 
         user.displayName = profile.displayName;
         user.name = profile.name;
-        user.emails = profile.emails;
+        user.emails = profile.emails || [];
         if (profile.photos)
           user.photos = profile.photos.map((photo) => ({
             ...photo,
