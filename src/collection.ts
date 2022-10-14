@@ -64,7 +64,7 @@ interface Allows {
   remove: false | AllowRemoveHandler;
 }
 
-type EventName = "preInsertMany" | "postInsertMany";
+type EventName = "preInsertMany" | "postInsertMany" | "postUpdateMany";
 
 export async function userIsAdmin(
   _doc: Document | ChangeSetUpdate | string,
@@ -77,6 +77,27 @@ export async function userIsAdmin(
   if (!user || !user.admin) return "NOT_ADMIN";
 
   return true;
+}
+
+export async function userIdMatches(
+  doc: Document | ChangeSetUpdate | string,
+  { dba, auth, collection, eventName }: CollectionEventProps
+) {
+  const userId = await auth.userId();
+  if (!userId) return "NOT_LOGGED_IN";
+
+  if (typeof doc === "object" && "patch" in doc) {
+    // Update
+    const existingDoc = await collection.findOne(doc._id);
+    if (!existingDoc) return "NO_EXISTING_DOC";
+    return userId.equals(existingDoc.userId) || "doc.userId !== userId";
+  }
+
+  // TODO, for delete
+
+  console.log({ doc, userId });
+  // @ts-expect-error: TODO
+  return userId.equals(doc.userId) || "doc.userId !== userId";
 }
 
 export default class Collection {
@@ -93,7 +114,11 @@ export default class Collection {
     this._allows = { insert: false, update: false, remove: false };
     // https://github.com/Meteor-Community-Packages/meteor-collection-hooks TODO
     // this.before = { insertOne: [] };
-    this._events = { preInsertMany: [], postInsertMany: [] };
+    this._events = {
+      preInsertMany: [],
+      postInsertMany: [],
+      postUpdateMany: [],
+    };
   }
 
   allow(operationName: "insert", func: AllowInsertHandler): void;

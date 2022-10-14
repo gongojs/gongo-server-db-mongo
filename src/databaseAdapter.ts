@@ -155,12 +155,24 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
     _props: MethodProps<MongoDatabaseAdapter>
   ): Promise<Array<OpError>> {
     const coll = this.collection(collName);
+
+    /*
     const props: CollectionEventProps = {
       collection: coll,
       eventName: "update",
       ..._props,
     };
+    */
+
     await coll.applyPatches(updates);
+
+    const postUpdateManyProps: CollectionEventProps = {
+      collection: coll,
+      eventName: "postUpdateMany",
+      ..._props,
+    };
+    coll.eventExec("postUpdateMany", postUpdateManyProps, { entries: updates });
+
     return [];
   }
 
