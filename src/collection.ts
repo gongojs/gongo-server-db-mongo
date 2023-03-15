@@ -12,6 +12,7 @@ import type {
 } from "mongodb";
 import type { MethodProps } from "gongo-server";
 import type { OpError } from "gongo-server/lib/DatabaseAdapter.js";
+import { ObjectId } from "mongodb";
 
 // https://advancedweb.hu/how-to-use-async-functions-with-array-filter-in-javascript/
 // I added types.
@@ -88,7 +89,8 @@ export async function userIdMatches(
 
   if (typeof doc === "object" && "patch" in doc) {
     // Update
-    const existingDoc = await collection.findOne(doc._id);
+    const docId = typeof doc._id === "string" ? new ObjectId(doc._id) : doc._id;
+    const existingDoc = await collection.findOne(docId);
     if (!existingDoc) return "NO_EXISTING_DOC";
     return userId.equals(existingDoc.userId) || "doc.userId !== userId";
   }
