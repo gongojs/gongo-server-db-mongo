@@ -82,24 +82,36 @@ export async function userIsAdmin(
 
 export async function userIdMatches(
   doc: Document | ChangeSetUpdate | string,
-  { dba, auth, collection, eventName }: CollectionEventProps
+  { auth, collection, eventName }: CollectionEventProps
 ) {
   const userId = await auth.userId();
   if (!userId) return "NOT_LOGGED_IN";
 
+  // TODO, use this instead of inspecting doc? :)
+  eventName;
+
+  // UPDATES (doc is a ChangeSetUpdate)
   if (typeof doc === "object" && "patch" in doc) {
-    // Update
     const docId = typeof doc._id === "string" ? new ObjectId(doc._id) : doc._id;
     const existingDoc = await collection.findOne(docId);
     if (!existingDoc) return "NO_EXISTING_DOC";
-    return userId.equals(existingDoc.userId) || "doc.userId !== userId";
+    return (
+      userId.equals(existingDoc.userId) || "doc.userId !== userId (for patch)"
+    );
   }
 
-  // TODO, for delete
+  // DELETES (doc is an ObjectId)
+  if (doc instanceof ObjectId || typeof doc === "string") {
+    const docId = typeof doc === "string" ? new ObjectId(doc) : doc;
+    const existingDoc = await collection.findOne(docId);
+    if (!existingDoc) return "NO_EXISTING_DOC";
+    return (
+      userId.equals(existingDoc.userId) || "doc.userId !== userId (for delete)"
+    );
+  }
 
   console.log({ doc, userId });
-  // @ts-expect-error: TODO
-  return userId.equals(doc.userId) || "doc.userId !== userId";
+  return userId.equals(doc.userId) || "doc.userId !== userId (for unmatched)";
 }
 
 export default class Collection {
