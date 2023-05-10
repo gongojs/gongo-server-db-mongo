@@ -1,16 +1,17 @@
 import type DatabaseAdapter from "./databaseAdapter.js";
 import type Collection from "./collection.js";
-import type { Document, Filter, Sort, SortDirection } from "mongodb";
+import type { GongoDocument } from "./collection.js";
+import type { Filter, Sort, SortDirection } from "mongodb";
 
-export default class Cursor {
+export default class Cursor<DocType extends GongoDocument = GongoDocument> {
   db: DatabaseAdapter;
-  coll: Collection;
-  filter: Filter<Document>;
+  coll: Collection<DocType>;
+  filter: Filter<DocType>;
   _limit: number | null = null;
   _sort: { sort: Sort; direction?: SortDirection } | null = null;
   _skip: number | null = null;
 
-  constructor(coll: Collection, filter: Filter<Document>) {
+  constructor(coll: Collection<DocType>, filter: Filter<DocType>) {
     this.db = coll.db;
     this.coll = coll;
     this.filter = filter;
@@ -34,7 +35,7 @@ export default class Cursor {
   async toArray() {
     const db = await this.db.dbPromise;
 
-    const cursor = db.collection(this.coll.name).find(this.filter);
+    const cursor = db.collection<DocType>(this.coll.name).find(this.filter);
 
     if (this._sort) cursor.sort(this._sort.sort, this._sort.direction);
     if (this._limit) cursor.limit(this._limit);

@@ -1,12 +1,25 @@
-import Collection from "./collection";
+import { ObjectId } from "bson";
+import Collection, { GongoDocument } from "./collection";
 import Cursor from "./cursor";
 import type { OpError } from "gongo-server/lib/DatabaseAdapter.js";
+import "./toHaveObjectId";
 
 const now = Date.now();
 const dateNowSpy = jest.spyOn(global.Date, "now");
 function dateNowNext(value = now) {
   dateNowSpy.mockImplementationOnce(() => value);
 }
+
+interface DocWithOptStrId extends GongoDocument {
+  _id?: string;
+}
+
+const mkId = () => new ObjectId().toHexString();
+const mkIds = (i: number) =>
+  "X"
+    .repeat(i)
+    .split("")
+    .map(() => new ObjectId().toHexString());
 
 describe("Collection", () => {
   describe("constructor", () => {
@@ -97,7 +110,7 @@ describe("Collection", () => {
       const newRow = { _id: "a" };
       const db = { dbPromise: Promise.resolve(mongoDb) };
       // @ts-expect-error: stub
-      const collection = new Collection(db, "collection");
+      const collection = new Collection<DocWithOptStrId>(db, "collection");
 
       dateNowNext(now);
       const result = await collection.insertOne(newRow);
@@ -120,7 +133,7 @@ describe("Collection", () => {
 
       const db = { dbPromise: Promise.resolve(mongoDb) };
       // @ts-expect-error: stub
-      const collection = new Collection(db, "collection");
+      const collection = new Collection<DocWithOptStrId>(db, "collection");
 
       // For now we'll be lazy and rely on fact that API says we can mutate
       const docs = [{ _id: "a" }, { _id: "b" }];
@@ -183,20 +196,23 @@ describe("Collection", () => {
       const collection = new Collection(db, "collection");
 
       dateNowNext(now);
-      await collection.markAsDeleted(["a", "b"]);
+      await collection.markAsDeleted([
+        "12345678901234567890aaaa",
+        "12345678901234567890bbbb",
+      ]);
 
       expect(mongoCol.bulkWrite).toHaveBeenCalledWith([
         {
           replaceOne: {
-            filter: { _id: "a" },
-            replacement: { _id: "a", __deleted: true, __updatedAt: now },
+            filter: { _id: expect.toHaveObjectId("12345678901234567890aaaa") },
+            replacement: { __deleted: true, __updatedAt: now },
             upsert: true,
           },
         },
         {
           replaceOne: {
-            filter: { _id: "b" },
-            replacement: { _id: "b", __deleted: true, __updatedAt: now },
+            filter: { _id: expect.toHaveObjectId("12345678901234567890bbbb") },
+            replacement: { __deleted: true, __updatedAt: now },
             upsert: true,
           },
         },
@@ -341,11 +357,11 @@ describe("Collection", () => {
       // @ts-expect-error: stub
       const collection = new Collection(db, "collection");
 
-      const origDoc = { _id: "id", a: 1 };
+      const origDoc = { _id: "12345678901234567890aaaa", a: 1 };
       mongoCol.findOne.mockReturnValueOnce(origDoc);
 
       const entry = {
-        _id: "id",
+        _id: "12345678901234567890aaaa",
         patch: [{ op: "replace", path: "/a", value: 2 }],
       };
 
@@ -353,7 +369,7 @@ describe("Collection", () => {
       // @ts-expect-error: stub
       await collection.applyPatch(entry);
       expect(mongoCol.updateOne).toBeCalledWith(
-        { _id: "id" },
+        { _id: expect.toHaveObjectId("12345678901234567890aaaa") },
         {
           $set: {
             a: 2,
@@ -381,17 +397,19 @@ describe("Collection", () => {
       // @ts-expect-error: stub
       const collection = new Collection(db, "collection");
 
+      const [id1, id2] = mkIds(2);
+
       const origDocs = [
-        { _id: "id1", a: 1 },
-        { _id: "id2", a: 2 },
+        { _id: id1, a: 1 },
+        { _id: id2, a: 2 },
       ];
       const entries = [
         {
-          _id: "id1",
+          _id: id1,
           patch: [{ op: "replace", path: "/a", value: 3 }],
         },
         {
-          _id: "id2",
+          _id: id2,
           patch: [{ op: "replace", path: "/a", value: 4 }],
         },
       ];
@@ -407,13 +425,13 @@ describe("Collection", () => {
       expect(mongoCol.bulkWrite).toBeCalledWith([
         {
           updateOne: {
-            filter: { _id: "id1" },
+            filter: { _id: expect.toHaveObjectId(id1) },
             update: { $set: { a: 3, __updatedAt: now } },
           },
         },
         {
           updateOne: {
-            filter: { _id: "id2" },
+            filter: { _id: expect.toHaveObjectId(id2) },
             update: { $set: { a: 4, __updatedAt: now } },
           },
         },
@@ -436,10 +454,11 @@ describe("Collection", () => {
       // @ts-expect-error: stub
       const collection = new Collection(db, "collection");
 
-      const origDocs = [{ _id: "id1", a: 1 }];
+      const id1 = mkId();
+      const origDocs = [{ _id: id1, a: 1 }];
       const entries = [
         {
-          _id: "id1",
+          _id: id1,
           patch: [],
         },
       ];
@@ -453,7 +472,7 @@ describe("Collection", () => {
       expect(mongoCol.bulkWrite).toBeCalledWith([
         {
           updateOne: {
-            filter: { _id: "id1" },
+            filter: { _id: expect.toHaveObjectId(id1) },
             update: { $set: { __updatedAt: now } },
           },
         },

@@ -4,15 +4,31 @@ import Cursor from "./cursor";
 import type DatabaseAdapter from "./databaseAdapter.js";
 import type { ChangeSetUpdate } from "gongo-server/lib/DatabaseAdapter.js";
 import type {
-  Document,
+  Document as MongoDocument,
   Filter,
   ReplaceOptions,
   UpdateFilter,
   UpdateOptions,
+  OptionalUnlessRequiredId,
 } from "mongodb";
 import type { MethodProps } from "gongo-server";
 import type { OpError } from "gongo-server/lib/DatabaseAdapter.js";
 import { ObjectId } from "mongodb";
+
+// https://github.com/mongodb/node-mongodb-native/blob/b67af3cd/src/mongo_types.ts#L46 thanks Mongo team
+/** TypeScript Omit (Exclude to be specific) does not work for objects with an "any" indexed type, and breaks discriminated unions @public */
+export type EnhancedOmit<TRecordOrUnion, KeyUnion> =
+  string extends keyof TRecordOrUnion
+    ? TRecordOrUnion // TRecordOrUnion has indexed type e.g. { _id: string; [k: string]: any; } or it is "any"
+    : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    TRecordOrUnion extends any
+    ? Pick<TRecordOrUnion, Exclude<keyof TRecordOrUnion, KeyUnion>> // discriminated unions
+    : never;
+
+export interface GongoDocument extends MongoDocument {
+  __deleted?: boolean;
+  __updatedAt?: number;
+}
 
 // https://advancedweb.hu/how-to-use-async-functions-with-array-filter-in-javascript/
 // I added types.
@@ -30,46 +46,48 @@ const asyncFilter = async <T>(
 type ArrayElement<ArrayType extends readonly unknown[]> =
   ArrayType extends readonly (infer ElementType)[] ? ElementType : never;
 
-export interface CollectionEventProps extends MethodProps<DatabaseAdapter> {
-  collection: Collection;
+export interface CollectionEventProps<
+  DocType extends GongoDocument = GongoDocument
+> extends MethodProps<DatabaseAdapter> {
+  collection: Collection<DocType>;
   eventName: string;
 }
 
-export type AllowInsertHandler = (
-  doc: Document,
-  props: CollectionEventProps
+export type AllowInsertHandler<DocType extends GongoDocument> = (
+  doc: DocType,
+  props: CollectionEventProps<DocType>
 ) => Promise<boolean | string>;
-export type AllowUpdateHandler = (
+export type AllowUpdateHandler<DocType extends GongoDocument> = (
   update: ChangeSetUpdate,
-  props: CollectionEventProps
+  props: CollectionEventProps<DocType>
 ) => Promise<boolean | string>;
-export type AllowRemoveHandler = (
+export type AllowRemoveHandler<DocType extends GongoDocument> = (
   id: string,
-  props: CollectionEventProps
+  props: CollectionEventProps<DocType>
 ) => Promise<boolean | string>;
-export type AllowHandler =
-  | AllowInsertHandler
-  | AllowUpdateHandler
-  | AllowRemoveHandler;
+export type AllowHandler<DocType extends GongoDocument> =
+  | AllowInsertHandler<DocType>
+  | AllowUpdateHandler<DocType>
+  | AllowRemoveHandler<DocType>;
 
-type EventFunction = (
-  props: CollectionEventProps,
+type EventFunction<DocType extends GongoDocument> = (
+  props: CollectionEventProps<DocType>,
   args?: Record<string, unknown>
 ) => void;
 
 type OperationName = "insert" | "update" | "remove";
 
-interface Allows {
-  insert: false | AllowInsertHandler;
-  update: false | AllowUpdateHandler;
-  remove: false | AllowRemoveHandler;
+interface Allows<DocType extends GongoDocument> {
+  insert: false | AllowInsertHandler<DocType>;
+  update: false | AllowUpdateHandler<DocType>;
+  remove: false | AllowRemoveHandler<DocType>;
 }
 
 type EventName = "preInsertMany" | "postInsertMany" | "postUpdateMany";
 
-export async function userIsAdmin(
-  _doc: Document | ChangeSetUpdate | string,
-  { dba, auth }: CollectionEventProps
+export async function userIsAdmin<DocType extends GongoDocument>(
+  _doc: DocType | ChangeSetUpdate | string,
+  { dba, auth }: CollectionEventProps<DocType>
 ) {
   const userId = await auth.userId();
   if (!userId) return "NOT_LOGGED_IN";
@@ -80,9 +98,9 @@ export async function userIsAdmin(
   return true;
 }
 
-export async function userIdMatches(
-  doc: Document | ChangeSetUpdate | string,
-  { auth, collection, eventName }: CollectionEventProps
+export async function userIdMatches<DocType extends GongoDocument>(
+  doc: DocType | ChangeSetUpdate | string,
+  { auth, collection, eventName }: CollectionEventProps<DocType>
 ) {
   const userId = await auth.userId();
   if (!userId) return "NOT_LOGGED_IN";
@@ -102,8 +120,10 @@ export async function userIdMatches(
 
   // DELETES (doc is an ObjectId)
   if (doc instanceof ObjectId || typeof doc === "string") {
-    const docId = typeof doc === "string" ? new ObjectId(doc) : doc;
-    const existingDoc = await collection.findOne(docId);
+    const query: Partial<GongoDocument> = {
+      _id: typeof doc === "string" ? new ObjectId(doc) : doc,
+    };
+    const existingDoc = await collection.findOne(query);
     if (!existingDoc) return "NO_EXISTING_DOC";
     return (
       userId.equals(existingDoc.userId) || "doc.userId !== userId (for delete)"
@@ -114,12 +134,12 @@ export async function userIdMatches(
   return userId.equals(doc.userId) || "doc.userId !== userId (for unmatched)";
 }
 
-export default class Collection {
+export default class Collection<DocType extends GongoDocument = GongoDocument> {
   db: DatabaseAdapter;
   name: string;
   _indexCreated: boolean;
-  _allows: Allows;
-  _events: Record<EventName, Array<EventFunction>>;
+  _allows: Allows<DocType>;
+  _events: Record<EventName, Array<EventFunction<DocType>>>;
 
   constructor(db: DatabaseAdapter, name: string) {
     this.db = db;
@@ -135,10 +155,10 @@ export default class Collection {
     };
   }
 
-  allow(operationName: "insert", func: AllowInsertHandler): void;
-  allow(operationName: "update", func: AllowUpdateHandler): void;
-  allow(operationName: "remove", func: AllowRemoveHandler): void;
-  allow(operationName: OperationName, func: AllowHandler) {
+  allow(operationName: "insert", func: AllowInsertHandler<DocType>): void;
+  allow(operationName: "update", func: AllowUpdateHandler<DocType>): void;
+  allow(operationName: "remove", func: AllowRemoveHandler<DocType>): void;
+  allow(operationName: OperationName, func: AllowHandler<DocType>) {
     if (
       operationName !== "insert" &&
       operationName !== "update" &&
@@ -153,11 +173,11 @@ export default class Collection {
       throw new Error(`Operation "${operationName}" is already set`);
 
     if (operationName === "insert")
-      this._allows.insert = func as AllowInsertHandler;
+      this._allows.insert = func as AllowInsertHandler<DocType>;
     else if (operationName === "update")
-      this._allows.update = func as AllowUpdateHandler;
+      this._allows.update = func as AllowUpdateHandler<DocType>;
     else if (operationName === "remove")
-      this._allows.remove = func as AllowRemoveHandler;
+      this._allows.remove = func as AllowRemoveHandler<DocType>;
 
     // this._allows[operationName] = func;
   }
@@ -169,26 +189,26 @@ export default class Collection {
    */
   async allowFilter(
     operationName: "insert",
-    docs: Array<Document>,
-    props: CollectionEventProps,
+    docs: Array<DocType>,
+    props: CollectionEventProps<DocType>,
     errors: Array<OpError>
-  ): Promise<Array<Document>>;
+  ): Promise<Array<DocType>>;
   async allowFilter(
     operationName: "update",
     docs: Array<ChangeSetUpdate>,
-    props: CollectionEventProps,
+    props: CollectionEventProps<DocType>,
     errors: Array<OpError>
-  ): Promise<Array<Record<string, unknown>>>;
+  ): Promise<Array<DocType>>;
   async allowFilter(
     operationName: "remove",
     docs: Array<string>,
-    props: CollectionEventProps,
+    props: CollectionEventProps<DocType>,
     errors: Array<OpError>
   ): Promise<Array<string>>;
   async allowFilter(
     operationName: OperationName,
-    docs: Array<Document | ChangeSetUpdate | string>,
-    props: CollectionEventProps,
+    docs: Array<DocType | ChangeSetUpdate | string>,
+    props: CollectionEventProps<DocType>,
     errors: Array<OpError>
   ) {
     const allowHandler = this._allows[operationName];
@@ -211,16 +231,16 @@ export default class Collection {
 
     if (operationName === "insert") {
       const filtered = [];
-      const insertAllowHandler = allowHandler as AllowInsertHandler;
+      const insertAllowHandler = allowHandler as AllowInsertHandler<DocType>;
       for (const doc of docs) {
-        const result = await insertAllowHandler(doc as Document, props);
+        const result = await insertAllowHandler(doc as DocType, props);
         if (result === true) filtered.push(doc);
-        else errors.push([(doc as Document)._id, result]);
+        else errors.push([(doc as DocType)._id, result]);
       }
       return filtered;
     } else if (operationName === "update") {
       const filtered = [];
-      const updateAllowHandler = allowHandler as AllowUpdateHandler;
+      const updateAllowHandler = allowHandler as AllowUpdateHandler<DocType>;
       for (const doc of docs) {
         const result = await updateAllowHandler(doc as ChangeSetUpdate, props);
         if (result === true) filtered.push(doc);
@@ -229,7 +249,7 @@ export default class Collection {
       return filtered;
     } else if (operationName === "remove") {
       const filtered = [];
-      const removeAllowHandler = allowHandler as AllowRemoveHandler;
+      const removeAllowHandler = allowHandler as AllowRemoveHandler<DocType>;
       for (const id of docs) {
         const result = await removeAllowHandler(id as string, props);
         if (result === true) filtered.push(id);
@@ -244,14 +264,14 @@ export default class Collection {
     }
   }
 
-  on(eventName: EventName, func: EventFunction) {
+  on(eventName: EventName, func: EventFunction<DocType>) {
     if (this._events[eventName]) this._events[eventName].push(func);
     else throw new Error("No such event: " + eventName);
   }
 
   eventExec(
     eventName: EventName,
-    props: CollectionEventProps,
+    props: CollectionEventProps<DocType>,
     args?: Record<string, unknown>
   ) {
     if (!this._events[eventName])
@@ -262,7 +282,7 @@ export default class Collection {
 
   async getReal() {
     const db = await this.db.dbPromise;
-    const realColl = db.collection(this.name);
+    const realColl = db.collection<DocType>(this.name);
 
     // TODO is serverless the best place for this?
     if (!this._indexCreated) {
@@ -275,7 +295,7 @@ export default class Collection {
     return realColl;
   }
 
-  find(filter: Filter<Document> = {}) {
+  find(filter: Filter<DocType> = {}) {
     // deal with __updatedAts
     // if NO __updatedAt specified, should NOT include deleted records
     //   (because we're getting data for first time!)
@@ -283,12 +303,12 @@ export default class Collection {
     return new Cursor(this, filter);
   }
 
-  async findOne(filter: Filter<Document>) {
+  async findOne(filter: Filter<DocType>) {
     const realColl = await this.getReal();
     return await realColl.findOne(filter);
   }
 
-  async insertOne(doc: Document) {
+  async insertOne(doc: OptionalUnlessRequiredId<DocType>) {
     const realColl = await this.getReal();
 
     doc.__updatedAt = Date.now();
@@ -304,7 +324,7 @@ export default class Collection {
   gets correct server copy
    */
 
-  async insertMany(docArray: Array<Document>) {
+  async insertMany(docArray: OptionalUnlessRequiredId<DocType>[]) {
     const realColl = await this.getReal();
 
     const now = Date.now();
@@ -336,10 +356,14 @@ export default class Collection {
     const now = Date.now();
     return await realColl.bulkWrite(
       /// XXX XXX XXX does this even work?  need ObjectId(id)
+      /// XXX  fixed with typescript work.
       idArray.map((id) => ({
         replaceOne: {
-          filter: { _id: id },
-          replacement: { _id: id, __deleted: true, __updatedAt: now },
+          filter: { _id: new ObjectId(id) } as Partial<GongoDocument>,
+          replacement: {
+            __deleted: true,
+            __updatedAt: now,
+          } as GongoDocument as DocType,
           upsert: true /* XXX TODO */,
         },
       }))
@@ -347,8 +371,8 @@ export default class Collection {
   }
 
   async replaceOne(
-    filter: Filter<Document>,
-    doc: Document,
+    filter: Filter<DocType>,
+    doc: DocType,
     options?: ReplaceOptions
   ) {
     const realColl = await this.getReal();
@@ -362,23 +386,39 @@ export default class Collection {
   }
 
   async updateOne(
-    filter: Filter<Document>,
-    update: Partial<Document> | UpdateFilter<Document> = {},
+    filter: Filter<DocType>,
+    update: Partial<DocType> | UpdateFilter<DocType> = {},
     options?: UpdateOptions
   ) {
     const realColl = await this.getReal();
 
-    if (!update.$set) update.$set = {};
-    update.$set.__updatedAt = Date.now();
+    /*
+    const test1: GongoDocument = { __updatedAt: 1 };
+    const test2: DocType = { __updatedAt: 1 };
+    if (update.$set) update.$set.__updatedAt = Date.now();
+    else update.$set = { __updatedAt: Date.now() };
+    */
+
+    if (update.$set)
+      update.$set = {
+        ...update.$set,
+        __updatedAt: Date.now(),
+      };
+    else
+      update.$set = {
+        // @ts-expect-error: TODO, another day
+        __updatedAt: Date.now(),
+      };
 
     if (options) return realColl.updateOne(filter, update, options);
     else return realColl.updateOne(filter, update);
   }
 
   async applyPatch(entry: ChangeSetUpdate) {
-    const _id = entry._id;
-    const orig = await this.findOne({ _id });
-    const update = toMongoDb(entry.patch, orig) as UpdateFilter<Document>;
+    // XXX was string before update.
+    const idFilter = { _id: new ObjectId(entry._id) } as Partial<GongoDocument>;
+    const orig = await this.findOne(idFilter);
+    const update = toMongoDb(entry.patch, orig) as UpdateFilter<DocType>;
 
     /*
     updateOne does this already.
@@ -387,13 +427,14 @@ export default class Collection {
     */
 
     console.log("patch", entry, update);
-    return await this.updateOne({ _id }, update);
+    return await this.updateOne(idFilter, update);
   }
 
   async applyPatches(entries: Array<ChangeSetUpdate>) {
     const realColl = await this.getReal();
 
     const ids = entries.map((doc) => doc._id);
+    // @ts-expect-error: save for another day
     const origResult = await this.find({ _id: { $in: ids } }).toArray();
     const origDocs: Record<string, ArrayElement<typeof origResult>> = {};
     for (const doc of origResult) {
@@ -414,7 +455,8 @@ export default class Collection {
 
       bulk.push({
         updateOne: {
-          filter: { _id: entry._id },
+          // XXX was string before last update
+          filter: { _id: new ObjectId(entry._id) } as Partial<GongoDocument>,
           update,
         },
       });

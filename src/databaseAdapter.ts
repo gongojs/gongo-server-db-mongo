@@ -11,7 +11,7 @@ import type {
   ChangeSetUpdate,
   OpError,
   DbaUser,
-  ChangeSet,
+  // ChangeSet,
 } from "gongo-server/lib/DatabaseAdapter.js";
 import type GongoServerless from "gongo-server/lib/serverless.js";
 import type {
@@ -21,7 +21,7 @@ import type {
 import type { MethodProps } from "gongo-server";
 
 import Cursor from "./cursor";
-import Collection from "./collection";
+import Collection, { GongoDocument } from "./collection";
 import Users from "./users";
 import type { CollectionEventProps } from "./collection";
 
@@ -32,7 +32,7 @@ export interface MongoDbaUser extends DbaUser {
 class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
   client: _MongoClient;
   dbPromise: Promise<Db>;
-  collections: Record<string, Collection>;
+  collections: Record<string, Collection<GongoDocument>>;
   Users: Users;
   gs?: GongoServerless<MongoDatabaseAdapter>;
 
@@ -83,11 +83,13 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
     });
   }
 
-  collection(name: string) {
+  collection<DocType extends GongoDocument>(name: string): Collection<DocType> {
     if (!this.collections[name])
-      this.collections[name] = new Collection(this, name);
+      // @ts-expect-error: for another day
+      this.collections[name] = new Collection<DocType>(this, name);
 
-    return this.collections[name];
+    // @ts-expect-error: for another day
+    return this.collections[name] as Collection<DocType>;
   }
 
   async insert(
@@ -144,7 +146,9 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
       eventName: "postInsertMany",
       ..._props,
     }; // TODO skip non-inserted from mongo above
-    coll.eventExec("postInsertMany", preInsertManyProps, { entries: toInsert });
+    coll.eventExec("postInsertMany", postInsertManyProps, {
+      entries: toInsert,
+    });
 
     return errors;
   }
@@ -178,15 +182,18 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
 
   async remove(
     collName: string,
-    ids: Array<string>,
-    _props: MethodProps<MongoDatabaseAdapter>
+    ids: Array<string>
+    // _props: MethodProps<MongoDatabaseAdapter>
   ): Promise<Array<OpError>> {
     const coll = this.collection(collName);
+
+    /*
     const props: CollectionEventProps = {
       collection: coll,
       eventName: "remove",
       ..._props,
     };
+    */
 
     await coll.markAsDeleted(ids);
     return [];
