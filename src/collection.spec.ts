@@ -381,7 +381,8 @@ describe("Collection", () => {
   });
 
   describe("applyPatches", () => {
-    it("converts patch to mongo and updatesOnes", async () => {
+    /*
+    it("converts patch to mongo and bulkUpdates", async () => {
       const mongoDb = { collection: jest.fn() };
       const mongoCol = {
         createIndex: jest.fn(),
@@ -422,6 +423,7 @@ describe("Collection", () => {
       dateNowNext(now);
       // @ts-expect-error: stub
       await collection.applyPatches(entries);
+      
       expect(mongoCol.bulkWrite).toBeCalledWith([
         {
           updateOne: {
@@ -437,8 +439,73 @@ describe("Collection", () => {
         },
       ]);
     });
+    */
 
-    it("handles case where toMongoDb does not create $set", async () => {
+    it("converts patch to mongo and updatesOnes", async () => {
+      const mongoDb = { collection: jest.fn() };
+      const mongoCol = {
+        createIndex: jest.fn(),
+        updateOne: jest.fn(),
+        find: jest.fn(),
+        findOne: jest.fn(),
+        getReal: jest.fn(),
+      };
+      const mongoResult = {};
+
+      mongoDb.collection.mockReturnValue(mongoCol);
+      mongoCol.getReal.mockReturnValue(mongoCol);
+      mongoCol.updateOne.mockReturnValueOnce(mongoResult);
+
+      const db = { dbPromise: Promise.resolve(mongoDb) };
+      // @ts-expect-error: stub
+      const collection = new Collection(db, "collection");
+
+      const [id1, id2] = mkIds(2);
+
+      const origDocs = [
+        { _id: id1, a: 1 },
+        { _id: id2, a: 2 },
+      ];
+      const entries = [
+        {
+          _id: id1,
+          patch: [{ op: "replace", path: "/a", value: 3 }],
+        },
+        {
+          _id: id2,
+          patch: [{ op: "replace", path: "/a", value: 4 }],
+        },
+      ];
+
+      // const toArray = jest.fn();
+      // mongoCol.find.mockReturnValueOnce({ toArray });
+      // toArray.mockReturnValueOnce(origDocs);
+
+      mongoCol.findOne.mockReturnValueOnce(origDocs[0]);
+      mongoCol.findOne.mockReturnValueOnce(origDocs[1]);
+
+      dateNowNext(now);
+      dateNowNext(now);
+      // @ts-expect-error: stub
+      await collection.applyPatches(entries);
+
+      expect(mongoCol.updateOne).toHaveBeenCalledTimes(2);
+      expect(mongoCol.updateOne).toBeCalledWith(
+        { _id: expect.toHaveObjectId(id1) },
+        {
+          $set: { __updatedAt: expect.any(Number), a: 3 },
+        }
+      );
+      expect(mongoCol.updateOne).toBeCalledWith(
+        { _id: expect.toHaveObjectId(id2) },
+        {
+          $set: { __updatedAt: expect.any(Number), a: 4 },
+        }
+      );
+    });
+
+    /*
+    it("handles case where toMongoDb does not create $set (bulkwrite)", async () => {
       const mongoDb = { collection: jest.fn() };
       const mongoCol = {
         createIndex: jest.fn(),
@@ -477,6 +544,52 @@ describe("Collection", () => {
           },
         },
       ]);
+    });
+  });
+  */
+
+    it("handles case where toMongoDb does not create $set (updateOnes)", async () => {
+      const mongoDb = { collection: jest.fn() };
+      const mongoCol = {
+        createIndex: jest.fn(),
+        updateOne: jest.fn(),
+        find: jest.fn(),
+        findOne: jest.fn(),
+        getReal: jest.fn(),
+      };
+      const mongoResult = {};
+
+      mongoDb.collection.mockReturnValue(mongoCol);
+      mongoCol.getReal.mockReturnValue(mongoCol);
+      mongoCol.updateOne.mockReturnValueOnce(mongoResult);
+
+      const db = { dbPromise: Promise.resolve(mongoDb) };
+      // @ts-expect-error: stub
+      const collection = new Collection(db, "collection");
+
+      const id1 = mkId();
+      const origDocs = [{ _id: id1, a: 1 }];
+      const entries = [
+        {
+          _id: id1,
+          patch: [],
+        },
+      ];
+
+      const toArray = jest.fn();
+      mongoCol.find.mockReturnValueOnce({ toArray });
+      toArray.mockReturnValueOnce(origDocs);
+
+      dateNowNext(now);
+      await collection.applyPatches(entries);
+
+      expect(mongoCol.updateOne).toHaveBeenCalledTimes(1);
+      expect(mongoCol.updateOne).toBeCalledWith(
+        { _id: expect.toHaveObjectId(id1) },
+        {
+          $set: { __updatedAt: now },
+        }
+      );
     });
   });
 

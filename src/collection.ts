@@ -3,7 +3,7 @@ const toMongoDb = require("./jsonpatch-to-mongodb");
 import Cursor from "./cursor";
 import type DatabaseAdapter from "./databaseAdapter.js";
 import type { ChangeSetUpdate } from "gongo-server/lib/DatabaseAdapter.js";
-import type {
+import {
   Document as MongoDocument,
   Filter,
   ReplaceOptions,
@@ -14,6 +14,7 @@ import type {
 import type { MethodProps } from "gongo-server";
 import type { OpError } from "gongo-server/lib/DatabaseAdapter.js";
 import { ObjectId } from "mongodb";
+import * as jsonpatch from "fast-json-patch";
 
 // https://github.com/mongodb/node-mongodb-native/blob/b67af3cd/src/mongo_types.ts#L46 thanks Mongo team
 /** TypeScript Omit (Exclude to be specific) does not work for objects with an "any" indexed type, and breaks discriminated unions @public */
@@ -28,6 +29,12 @@ export type EnhancedOmit<TRecordOrUnion, KeyUnion> =
 export interface GongoDocument extends MongoDocument {
   __deleted?: boolean;
   __updatedAt?: number;
+}
+
+export interface ChangeSetUpdateResult {
+  _id: string;
+  $success?: boolean;
+  $error?: string;
 }
 
 // https://advancedweb.hu/how-to-use-async-functions-with-array-filter-in-javascript/
@@ -399,16 +406,17 @@ export default class Collection<DocType extends GongoDocument = GongoDocument> {
     else update.$set = { __updatedAt: Date.now() };
     */
 
-    if (update.$set)
+    if (update.$set) {
       update.$set = {
         ...update.$set,
         __updatedAt: Date.now(),
       };
-    else
+    } else {
+      // @ts-expect-error: TODO, another day
       update.$set = {
-        // @ts-expect-error: TODO, another day
         __updatedAt: Date.now(),
       };
+    }
 
     if (options) return realColl.updateOne(filter, update, options);
     else return realColl.updateOne(filter, update);
@@ -418,7 +426,18 @@ export default class Collection<DocType extends GongoDocument = GongoDocument> {
     // XXX was string before update.
     const idFilter = { _id: new ObjectId(entry._id) } as Partial<GongoDocument>;
     const orig = await this.findOne(idFilter);
-    const update = toMongoDb(entry.patch, orig) as UpdateFilter<DocType>;
+    let fallback = false;
+
+    const update = (function () {
+      try {
+        return toMongoDb(entry.patch, orig) as UpdateFilter<DocType>;
+      } catch (error) {
+        console.log("Skipping toMongoDb update because of error.");
+        console.log(error);
+        fallback = true;
+        return null;
+      }
+    })();
 
     /*
     updateOne does this already.
@@ -426,11 +445,43 @@ export default class Collection<DocType extends GongoDocument = GongoDocument> {
     update.$set.__updatedAt = Date.now();
     */
 
-    console.log("patch", entry, update);
-    return await this.updateOne(idFilter, update);
+    if (update) {
+      console.log("patch", entry, update);
+
+      const result = await (async () => {
+        try {
+          return await this.updateOne(idFilter, update);
+        } catch (error) {
+          console.log("Skipping toMongoDb update because of error.");
+          console.log(error);
+          fallback = true;
+        }
+      })();
+
+      console.log(result);
+      return result;
+    }
+
+    if (fallback) {
+      console.log("Falling back to apply patch directly and replaceOne");
+      const result = jsonpatch.applyPatch(orig, entry.patch, true);
+      console.log(result);
+
+      if (result.newDocument) {
+        // @ts-expect-error: another day
+        this.replaceOne(idFilter, result.newDocument);
+      } else console.log(result);
+      throw new Error("No newDocument on jsonpatch.applyPatch result");
+    }
+
+    return { _id: entry._id, $success: true };
   }
 
   async applyPatches(entries: Array<ChangeSetUpdate>) {
+    return await Promise.all(entries.map(this.applyPatch.bind(this)));
+  }
+
+  async applyPatches1(entries: Array<ChangeSetUpdate>) {
     const realColl = await this.getReal();
 
     const ids = entries.map((doc) => doc._id);
@@ -442,7 +493,6 @@ export default class Collection<DocType extends GongoDocument = GongoDocument> {
     }
 
     const bulk = [];
-
     //for (const entry of entries) {
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i];
