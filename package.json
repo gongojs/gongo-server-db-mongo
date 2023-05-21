@@ -42,7 +42,7 @@
     "fast-json-patch": "^3.1.1",
     "json-pointer": "^0.6.2",
     "jsonpatch-to-mongodb": "^1.0.0",
-    "mongodb": "^4.6.0"
+    "mongodb": "4.16.0"
   },
   "peerDependencies": {
     "gongo-server": "^2.0.0"
