@@ -279,13 +279,29 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
 
   async publishHelper(
     publishResult: Cursor | PublicationResult,
-    { updatedAt }: PublicationProps<MongoDatabaseAdapter>
+    {
+      updatedAt,
+      limit,
+      sort,
+      lastSortedValue,
+    }: PublicationProps<MongoDatabaseAdapter>
   ) {
     if (publishResult instanceof Cursor) {
       const collName = publishResult.coll.name;
       if (!publishResult.filter) publishResult.filter = {};
-      if (updatedAt && updatedAt[collName])
+      if (updatedAt && updatedAt[collName]) {
         publishResult.filter.__updatedAt = { $gt: updatedAt[collName] };
+      } else {
+        if (sort) publishResult.sort(sort[0], sort[1]);
+        if (limit) publishResult.limit(limit);
+        if (lastSortedValue) {
+          if (!sort) throw new Error("lastSortedValue requires sort");
+          publishResult.filter[sort[0]] = {
+            [sort[1] === "asc" ? "$gt" : "$lt"]: lastSortedValue,
+          };
+        }
+      }
+      // console.log(publishResult);
 
       const helpedResult: PublicationResult = [];
       const entries = await publishResult.toArray();

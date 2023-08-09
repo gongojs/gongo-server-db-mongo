@@ -412,8 +412,8 @@ export default class Collection<DocType extends GongoDocument = GongoDocument> {
         __updatedAt: Date.now(),
       };
     } else {
-      // @ts-expect-error: TODO, another day
       update.$set = {
+        // @ts-expect-error: TODO, another day
         __updatedAt: Date.now(),
       };
     }
