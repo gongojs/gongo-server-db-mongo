@@ -291,6 +291,8 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
       if (!publishResult.filter) publishResult.filter = {};
       if (updatedAt && updatedAt[collName]) {
         publishResult.filter.__updatedAt = { $gt: updatedAt[collName] };
+        publishResult.sort("__updatedAt", "asc");
+        publishResult.limit(200);
       } else {
         if (sort) publishResult.sort(sort[0], sort[1]);
         if (limit) publishResult.limit(limit);
