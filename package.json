@@ -28,7 +28,7 @@
     "mongo-mock": "^4.1.0",
     "prettier": "^2.6.2",
     "ts-jest": "^28.0.4",
-    "typescript": "^4.7.2"
+    "typescript": "5.2.2"
   },
   "scripts": {
     "lint": "eslint src",
