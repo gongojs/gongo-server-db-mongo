@@ -71,6 +71,26 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
           // console.log(id, keys, true);
           if (keys[0] === "_bsontype" && keys[1] === "id")
             return [(id as ObjectId).toHexString()];
+
+          if (
+            "toExtendedJSON" in id &&
+            typeof id.toExtendedJSON === "function"
+          ) {
+            const result = id.toExtendedJSON();
+            if (typeof result === "object" && result["$oid"]) {
+              return [result["$oid"]];
+            }
+          }
+
+          if ("inspect" in id && typeof id.inspect === "function") {
+            const result = id.inspect();
+            if (typeof result === "string") {
+              const match = result.match(
+                /new ObjectId\("(?<hexId>[0-9a-f]{24})"\)/
+              );
+              if (match && match.groups) return [match.groups.hexId];
+            }
+          }
         }
 
         return false;
