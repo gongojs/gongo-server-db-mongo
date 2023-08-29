@@ -1,4 +1,4 @@
-import { ObjectId } from "mongodb";
+import { ObjectId } from "bson";
 import type { MatcherFunction } from "expect";
 import { expect } from "@jest/globals";
 

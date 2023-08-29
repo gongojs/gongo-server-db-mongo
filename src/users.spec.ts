@@ -1,4 +1,4 @@
-import { ObjectId } from "mongodb";
+import { ObjectId } from "bson";
 import Users from "./users";
 import Collection from "./collection";
 
