@@ -1,11 +1,26 @@
+/*
 import {
   MongoClient as _MongoClient,
-  ObjectId,
-  Document,
   MongoBulkWriteError,
   WriteError,
 } from "mongodb";
-import type { Db } from "mongodb";
+*/
+import type {
+  MongoBulkWriteError as MongoBulkWriteErrorType,
+  WriteError as WriteErrorType,
+} from "mongodb";
+
+// @ts-expect-error: yup
+import * as bulkCommon from "mongodb/lib/bulk/common";
+
+const {
+  MongoBulkWriteError,
+}: {
+  MongoBulkWriteError: typeof MongoBulkWriteErrorType;
+} = bulkCommon;
+
+import { ObjectId } from "bson";
+import type { MongoClient as _MongoClient, Db, Document } from "mongodb";
 import type DatabaseAdapter from "gongo-server/lib/DatabaseAdapter.js";
 import type {
   ChangeSetUpdate,
@@ -36,15 +51,22 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
   Users: Users;
   gs?: GongoServerless<MongoDatabaseAdapter>;
 
-  constructor(url: string, dbName = "gongo", MongoClient = _MongoClient) {
-    const client = (this.client = new MongoClient(url));
+  constructor(
+    urlOrMongoClientInstance: string | _MongoClient,
+    dbName = "gongo",
+    MongoClient?: typeof _MongoClient
+  ) {
+    const client = (this.client = (function () {
+      if (typeof urlOrMongoClientInstance === "string") {
+        if (!MongoClient)
+          throw new Error("URL provided but MongoClient not provided");
+        return new MongoClient(urlOrMongoClientInstance);
+      } else {
+        return urlOrMongoClientInstance;
+      }
+    })());
 
-    this.dbPromise = new Promise((resolve, reject) => {
-      client.connect((err) => {
-        if (err) reject(err);
-        resolve(client.db(dbName));
-      });
-    });
+    this.dbPromise = client.connect().then((client) => client.db(dbName));
 
     this.collections = {};
     this.Users = new Users(this);
@@ -145,7 +167,7 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
     } catch (error) {
       if (error instanceof MongoBulkWriteError) {
         error.writeErrors;
-        for (const writeError of error.writeErrors as Array<WriteError>) {
+        for (const writeError of error.writeErrors as Array<WriteErrorType>) {
           // TODO, log full error on server?
           // TODO, "as string"... think more about types... objectid?  in code elsewhere
           // TODO, not tested yet!

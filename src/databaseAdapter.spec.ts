@@ -17,9 +17,9 @@ const mongoUrl = "mongodb://localhost:27017/gongoTest";
 let FakeMongoClientWillThrow: Error | null = null;
 class _FakeMongoClient {
   name = "";
-  connect(callback: (err: unknown, res?: unknown) => void) {
-    if (FakeMongoClientWillThrow) callback(FakeMongoClientWillThrow);
-    else callback(null, this);
+  async connect() {
+    if (FakeMongoClientWillThrow) throw FakeMongoClientWillThrow;
+    return this;
   }
   db(name: string) {
     this.name = name;

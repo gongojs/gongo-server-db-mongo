@@ -5,30 +5,40 @@ import type {
   DbaUsers,
   Profile,
 } from "gongo-server/lib/DatabaseAdapter.js";
-import { ObjectId } from "mongodb";
+import { ObjectId } from "bson";
 import type {
   Document,
   Filter,
   ReplaceOptions,
   UpdateFilter,
   UpdateOptions,
+  WithId,
 } from "mongodb";
 
 import type DatabaseAdapter from "./databaseAdapter.js";
 import type { MongoDbaUser } from "./databaseAdapter.js";
 import type Collection from "./collection.js";
+import type { GongoDocument } from "./collection.js";
+
+interface SessionData extends GongoDocument {
+  [key: string]: unknown;
+  _id: string;
+  userId: ObjectId;
+  ip?: string;
+  userAgent?: string;
+}
 
 export default class Users implements DbaUsers {
   dba: DatabaseAdapter;
   users: Collection;
-  sessions: Collection;
+  sessions: Collection<SessionData>;
 
   constructor(dba: DatabaseAdapter) {
     this.dba = dba;
 
     // TODO custom names
     this.users = dba.collection("users");
-    this.sessions = dba.collection("sessions");
+    this.sessions = dba.collection<SessionData>("sessions");
   }
 
   async setSessionData(sid: string, data: Record<string, unknown>) {
@@ -109,11 +119,12 @@ export default class Users implements DbaUsers {
     refreshToken: string
   ): Promise<MongoDbaUser> {
     const filter: Filter<Document> = { $or: [] };
+    const $or = filter.$or as Filter<WithId<Document>>[];
     if (email) {
       if (typeof email === "string") {
-        filter.$or.push({ "emails.value": email });
+        $or.push({ "emails.value": email });
       } else if (Array.isArray(email)) {
-        filter.$or.push({
+        $or.push({
           "emails.value": { $in: email.map((email) => email.value) },
         });
       } else {
@@ -126,7 +137,7 @@ export default class Users implements DbaUsers {
       }
     }
     if (service)
-      filter.$or.push({
+      $or.push({
         $and: [{ "services.service": service }, { "services.id": id }],
       });
 

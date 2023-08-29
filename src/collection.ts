@@ -3,7 +3,7 @@ const toMongoDb = require("./jsonpatch-to-mongodb");
 import Cursor from "./cursor";
 import type DatabaseAdapter from "./databaseAdapter.js";
 import type { ChangeSetUpdate } from "gongo-server/lib/DatabaseAdapter.js";
-import {
+import type {
   Document as MongoDocument,
   Filter,
   ReplaceOptions,
@@ -13,7 +13,7 @@ import {
 } from "mongodb";
 import type { MethodProps } from "gongo-server";
 import type { OpError } from "gongo-server/lib/DatabaseAdapter.js";
-import { ObjectId } from "mongodb";
+import { ObjectId } from "bson";
 import * as jsonpatch from "fast-json-patch";
 
 // https://github.com/mongodb/node-mongodb-native/blob/b67af3cd/src/mongo_types.ts#L46 thanks Mongo team
