@@ -52,6 +52,12 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
   gs?: GongoServerless<MongoDatabaseAdapter>;
 
   constructor(
+    url: string,
+    dbName: string | undefined,
+    MongoClient: typeof _MongoClient
+  );
+  constructor(client: _MongoClient, dbName?: string);
+  constructor(
     urlOrMongoClientInstance: string | _MongoClient,
     dbName = "gongo",
     MongoClient?: typeof _MongoClient
