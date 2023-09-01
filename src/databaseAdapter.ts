@@ -152,7 +152,7 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
       eventName: "preInsertMany",
       ..._props,
     };
-    coll.eventExec("preInsertMany", preInsertManyProps, { entries });
+    await coll.eventExec("preInsertMany", preInsertManyProps, { entries });
 
     const toInsert: Document[] = [];
     const errors: OpError[] = [];
@@ -194,7 +194,7 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
       eventName: "postInsertMany",
       ..._props,
     }; // TODO skip non-inserted from mongo above
-    coll.eventExec("postInsertMany", postInsertManyProps, {
+    await coll.eventExec("postInsertMany", postInsertManyProps, {
       entries: toInsert,
     });
 
@@ -223,7 +223,9 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
       eventName: "postUpdateMany",
       ..._props,
     };
-    coll.eventExec("postUpdateMany", postUpdateManyProps, { entries: updates });
+    await coll.eventExec("postUpdateMany", postUpdateManyProps, {
+      entries: updates,
+    });
 
     return [];
   }

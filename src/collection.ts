@@ -276,7 +276,7 @@ export default class Collection<DocType extends GongoDocument = GongoDocument> {
     else throw new Error("No such event: " + eventName);
   }
 
-  eventExec(
+  async eventExec(
     eventName: EventName,
     props: CollectionEventProps<DocType>,
     args?: Record<string, unknown>
@@ -284,7 +284,7 @@ export default class Collection<DocType extends GongoDocument = GongoDocument> {
     if (!this._events[eventName])
       throw new Error("No such event: " + eventName);
 
-    for (const func of this._events[eventName]) func.call(this, props, args);
+    for (const func of this._events[eventName]) await func.call(this, props, args);
   }
 
   async getReal() {

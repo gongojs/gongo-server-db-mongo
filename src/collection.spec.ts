@@ -630,7 +630,7 @@ describe("Collection", () => {
         const col = new Collection("db", "name");
         // @ts-expect-error: stub
         const func = () => col.eventExec("DOES_NOT_EXIST");
-        expect(func).toThrow(/No such event/);
+        expect(func).rejects.toThrow(/No such event/);
       });
     });
   });
