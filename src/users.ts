@@ -23,9 +23,13 @@ import type { GongoDocument } from "./collection.js";
 interface SessionData extends GongoDocument {
   [key: string]: unknown;
   _id: string;
+
   userId: ObjectId;
   ip?: string;
   userAgent?: string;
+
+  sessionToken?: string;
+  expires: Date;
 }
 
 export default class Users implements DbaUsers {
@@ -43,17 +47,17 @@ export default class Users implements DbaUsers {
 
   async setSessionData(sid: string, data: Record<string, unknown>) {
     await this.sessions.updateOne(
-      { _id: sid },
+      { $or: [{_id: sid}, { sessionToken: sid }] } ,
       { $set: data },
       { upsert: true }
     );
   }
 
   async getSessionData(sid: string) {
-    return await this.sessions.findOne({ _id: sid });
+    return await this.sessions.findOne({ $or: [{_id: sid}, { sessionToken: sid }] });
   }
 
-  async getUserWithEmailAndPassword(email: string, password: string) {
+  async getUserWithEmailAndPassword(_email: string, _password: string) {
     throw new Error("not implemented yet");
     return null;
   }
@@ -99,10 +103,12 @@ export default class Users implements DbaUsers {
     if (callback) callback(user);
 
     const result = await this.users.insertOne(user);
-    if (result.acknowledged && result.insertedId instanceof ObjectId) {
+    // This doesn't always work, must be multiple copies of bson package
+    if (result.acknowledged && result.insertedId/* instanceof ObjectId */) {
       user._id = result.insertedId;
       return user as MongoDbaUser;
     } else {
+      // console.log(result);
       throw new Error(
         "Unexpected mongo result in createUser():" + JSON.stringify(result)
       );

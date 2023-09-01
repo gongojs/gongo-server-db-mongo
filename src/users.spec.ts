@@ -33,10 +33,11 @@ describe("Users", () => {
       await users.setSessionData("sid", data);
 
       expect(users.sessions.updateOne).toHaveBeenCalledWith(
-        { _id: "sid" },
+        { $or: [ { _id: "sid" }, { sessionToken: "sid"}] },
         { $set: data },
         { upsert: true }
       );
+      
     });
   });
 
@@ -54,7 +55,7 @@ describe("Users", () => {
       users.sessions.findOne.mockReturnValueOnce({ _id: "sid", isAdmin: true });
       /* const data = */ await users.getSessionData("sid");
 
-      expect(users.sessions.findOne).toHaveBeenCalledWith({ _id: "sid" });
+      expect(users.sessions.findOne).toHaveBeenCalledWith({ $or: [ { _id: "sid" }, { sessionToken: "sid"}] });
     });
   });
 
