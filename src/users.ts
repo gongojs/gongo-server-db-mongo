@@ -1,5 +1,4 @@
 import type {
-  DbaUser,
   DbaUserEmail,
   DbaUserService,
   DbaUsers,
@@ -9,9 +8,6 @@ import { ObjectId } from "bson";
 import type {
   Document,
   Filter,
-  ReplaceOptions,
-  UpdateFilter,
-  UpdateOptions,
   WithId,
 } from "mongodb";
 
@@ -57,7 +53,7 @@ export default class Users implements DbaUsers {
     return await this.sessions.findOne({ $or: [{_id: sid}, { sessionToken: sid }] });
   }
 
-  async getUserWithEmailAndPassword(_email: string, _password: string) {
+  async getUserWithEmailAndPassword() {
     throw new Error("not implemented yet");
     return null;
   }
