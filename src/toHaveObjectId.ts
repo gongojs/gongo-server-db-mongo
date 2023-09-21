@@ -1,30 +1,30 @@
-import { ObjectId } from "bson";
+import { ObjectId } from "./objectid";
 import type { MatcherFunction } from "expect";
 import { expect } from "@jest/globals";
 
 const toHaveObjectId: MatcherFunction<[id: string | number]> = function (
   actual,
-  id
+  id,
 ) {
   if (!(actual instanceof ObjectId))
     throw new Error(
       "Received value should be ObjectId, not " +
         typeof ObjectId +
         ": " +
-        JSON.stringify(ObjectId)
+        JSON.stringify(ObjectId),
     );
   if (typeof id !== "string" && !Number.isInteger(id))
     throw new Error(
       "Expected value should be a string or integer, not " +
         typeof id +
         ": " +
-        JSON.stringify(id)
+        JSON.stringify(id),
     );
   return {
     pass: actual.toHexString() === id,
     message: () =>
       `expected ${this.utils.printReceived(
-        actual
+        actual,
       )} to be ObjectID(${this.utils.printExpected(id)})`,
   };
 };

@@ -10,6 +10,7 @@ import type {
   WriteError as WriteErrorType,
 } from "mongodb";
 
+/*
 // @ts-expect-error: yup
 import * as bulkCommon from "mongodb/lib/bulk/common";
 
@@ -18,8 +19,9 @@ const {
 }: {
   MongoBulkWriteError: typeof MongoBulkWriteErrorType;
 } = bulkCommon;
+*/
 
-import { ObjectId } from "bson";
+import { ObjectId } from "./objectid";
 import type { MongoClient as _MongoClient, Db, Document } from "mongodb";
 import type DatabaseAdapter from "gongo-server/lib/DatabaseAdapter.js";
 import type {
@@ -54,13 +56,13 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
   constructor(
     url: string,
     dbName: string | undefined,
-    MongoClient: typeof _MongoClient
+    MongoClient: typeof _MongoClient,
   );
   constructor(client: _MongoClient, dbName?: string);
   constructor(
     urlOrMongoClientInstance: string | _MongoClient,
     dbName = "gongo",
-    MongoClient?: typeof _MongoClient
+    MongoClient?: typeof _MongoClient,
   ) {
     const client = (this.client = (function () {
       if (typeof urlOrMongoClientInstance === "string") {
@@ -114,7 +116,7 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
             const result = id.inspect();
             if (typeof result === "string") {
               const match = result.match(
-                /new ObjectId\("(?<hexId>[0-9a-f]{24})"\)/
+                /new ObjectId\("(?<hexId>[0-9a-f]{24})"\)/,
               );
               if (match && match.groups) return [match.groups.hexId];
             }
@@ -143,7 +145,7 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
   async insert(
     collName: string,
     entries: Array<Record<string, unknown>>,
-    _props: MethodProps<MongoDatabaseAdapter>
+    _props: MethodProps<MongoDatabaseAdapter>,
   ): Promise<Array<OpError>> {
     const coll = this.collection(collName);
 
@@ -171,7 +173,13 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
       if (result.insertedCount !== entries.length)
         throw new Error("length mismatch");
     } catch (error) {
-      if (error instanceof MongoBulkWriteError) {
+      // if (error instanceof MongoBulkWriteError) {
+      const _error = error;
+      if (
+        error instanceof Error &&
+        error.constructor.name === "MongoBulkWriteError"
+      ) {
+        const error = _error as MongoBulkWriteErrorType;
         error.writeErrors;
         for (const writeError of error.writeErrors as Array<WriteErrorType>) {
           // TODO, log full error on server?
@@ -204,7 +212,7 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
   async update(
     collName: string,
     updates: Array<ChangeSetUpdate>,
-    _props: MethodProps<MongoDatabaseAdapter>
+    _props: MethodProps<MongoDatabaseAdapter>,
   ): Promise<Array<OpError>> {
     const coll = this.collection(collName);
 
@@ -232,7 +240,7 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
 
   async remove(
     collName: string,
-    ids: Array<string>
+    ids: Array<string>,
     // _props: MethodProps<MongoDatabaseAdapter>
   ): Promise<Array<OpError>> {
     const coll = this.collection(collName);
@@ -254,21 +262,21 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
     operationName: "insert",
     docs: Array<Record<string, unknown>>,
     _props: MethodProps<MongoDatabaseAdapter>,
-    errors: Array<OpError>
+    errors: Array<OpError>,
   ): Promise<Array<Record<string, unknown>>>;
   async allowFilter(
     collName: string,
     operationName: "update",
     docs: Array<ChangeSetUpdate>,
     _props: MethodProps<MongoDatabaseAdapter>,
-    errors: Array<OpError>
+    errors: Array<OpError>,
   ): Promise<Array<ChangeSetUpdate>>;
   async allowFilter(
     collName: string,
     operationName: "remove",
     docs: Array<string>,
     _props: MethodProps<MongoDatabaseAdapter>,
-    errors: Array<OpError>
+    errors: Array<OpError>,
   ): Promise<Array<string>>;
   async allowFilter(
     collName: string,
@@ -278,7 +286,7 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
       | Array<ChangeSetUpdate>
       | Array<string>,
     _props: MethodProps<MongoDatabaseAdapter>,
-    errors: Array<OpError>
+    errors: Array<OpError>,
   ): Promise<
     Array<Record<string, unknown>> | Array<ChangeSetUpdate> | Array<string>
   > {
@@ -294,14 +302,14 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
         "insert",
         docs as Document[],
         props,
-        errors
+        errors,
       );
     else if (operationName === "update")
       return await coll.allowFilter(
         "update",
         docs as ChangeSetUpdate[],
         props,
-        errors
+        errors,
       );
     // if (operationName === "remove")
     else
@@ -334,9 +342,11 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
       limit,
       sort,
       lastSortedValue,
-    }: PublicationProps<MongoDatabaseAdapter>
+    }: PublicationProps<MongoDatabaseAdapter>,
   ) {
     if (publishResult instanceof Cursor) {
+      const helpedResult: PublicationResult = [];
+
       const collName = publishResult.coll.name;
       if (!publishResult.filter) publishResult.filter = {};
       if (updatedAt && updatedAt[collName]) {
@@ -355,7 +365,6 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
       }
       // console.log(publishResult);
 
-      const helpedResult: PublicationResult = [];
       const entries = await publishResult.toArray();
       if (entries.length) helpedResult.push({ coll: collName, entries });
       return helpedResult;

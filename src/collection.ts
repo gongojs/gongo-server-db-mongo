@@ -13,7 +13,7 @@ import type {
 } from "mongodb";
 import type { MethodProps } from "gongo-server";
 import type { OpError } from "gongo-server/lib/DatabaseAdapter.js";
-import { ObjectId } from "bson";
+import { ObjectId } from "./objectid";
 import * as jsonpatch from "fast-json-patch";
 
 // https://github.com/mongodb/node-mongodb-native/blob/b67af3cd/src/mongo_types.ts#L46 thanks Mongo team
@@ -54,7 +54,7 @@ type ArrayElement<ArrayType extends readonly unknown[]> =
   ArrayType extends readonly (infer ElementType)[] ? ElementType : never;
 
 export interface CollectionEventProps<
-  DocType extends GongoDocument = GongoDocument
+  DocType extends GongoDocument = GongoDocument,
 > extends MethodProps<DatabaseAdapter> {
   collection: Collection<DocType>;
   eventName: string;
@@ -62,15 +62,15 @@ export interface CollectionEventProps<
 
 export type AllowInsertHandler<DocType extends GongoDocument> = (
   doc: DocType,
-  props: CollectionEventProps<DocType>
+  props: CollectionEventProps<DocType>,
 ) => Promise<boolean | string>;
 export type AllowUpdateHandler<DocType extends GongoDocument> = (
   update: ChangeSetUpdate,
-  props: CollectionEventProps<DocType>
+  props: CollectionEventProps<DocType>,
 ) => Promise<boolean | string>;
 export type AllowRemoveHandler<DocType extends GongoDocument> = (
   id: string,
-  props: CollectionEventProps<DocType>
+  props: CollectionEventProps<DocType>,
 ) => Promise<boolean | string>;
 export type AllowHandler<DocType extends GongoDocument> =
   | AllowInsertHandler<DocType>
@@ -79,7 +79,7 @@ export type AllowHandler<DocType extends GongoDocument> =
 
 type EventFunction<DocType extends GongoDocument> = (
   props: CollectionEventProps<DocType>,
-  args?: Record<string, unknown>
+  args?: Record<string, unknown>,
 ) => void;
 
 type OperationName = "insert" | "update" | "remove";
@@ -94,7 +94,7 @@ type EventName = "preInsertMany" | "postInsertMany" | "postUpdateMany";
 
 export async function userIsAdmin<DocType extends GongoDocument>(
   _doc: DocType | ChangeSetUpdate | string,
-  { dba, auth }: CollectionEventProps<DocType>
+  { dba, auth }: CollectionEventProps<DocType>,
 ) {
   const userId = await auth.userId();
   if (!userId) return "NOT_LOGGED_IN";
@@ -107,7 +107,7 @@ export async function userIsAdmin<DocType extends GongoDocument>(
 
 export async function userIdMatches<DocType extends GongoDocument>(
   doc: DocType | ChangeSetUpdate | string,
-  { auth, collection, eventName }: CollectionEventProps<DocType>
+  { auth, collection, eventName }: CollectionEventProps<DocType>,
 ) {
   const userId = await auth.userId();
   if (!userId) return "NOT_LOGGED_IN";
@@ -173,7 +173,7 @@ export default class Collection<DocType extends GongoDocument = GongoDocument> {
     )
       throw new Error(
         `No such operation "${operationName}", should be one of: ` +
-          Object.keys(this._allows).join(", ")
+          Object.keys(this._allows).join(", "),
       );
 
     if (this._allows[operationName])
@@ -198,25 +198,25 @@ export default class Collection<DocType extends GongoDocument = GongoDocument> {
     operationName: "insert",
     docs: Array<DocType>,
     props: CollectionEventProps<DocType>,
-    errors: Array<OpError>
+    errors: Array<OpError>,
   ): Promise<Array<DocType>>;
   async allowFilter(
     operationName: "update",
     docs: Array<ChangeSetUpdate>,
     props: CollectionEventProps<DocType>,
-    errors: Array<OpError>
+    errors: Array<OpError>,
   ): Promise<Array<DocType>>;
   async allowFilter(
     operationName: "remove",
     docs: Array<string>,
     props: CollectionEventProps<DocType>,
-    errors: Array<OpError>
+    errors: Array<OpError>,
   ): Promise<Array<string>>;
   async allowFilter(
     operationName: OperationName,
     docs: Array<DocType | ChangeSetUpdate | string>,
     props: CollectionEventProps<DocType>,
-    errors: Array<OpError>
+    errors: Array<OpError>,
   ) {
     const allowHandler = this._allows[operationName];
 
@@ -226,7 +226,7 @@ export default class Collection<DocType extends GongoDocument = GongoDocument> {
           // @ts-expect-error: i hate you typescript
           const id = operationName === "remove" ? doc : doc._id;
           return [id, `No "${operationName}" allow handler`] as OpError;
-        })
+        }),
       );
       return [];
       /*
@@ -266,7 +266,7 @@ export default class Collection<DocType extends GongoDocument = GongoDocument> {
     } else {
       throw new Error(
         `Invalid operation name "${operationName}", ` +
-          'expected: "insert" | "update" | "remove".'
+          'expected: "insert" | "update" | "remove".',
       );
     }
   }
@@ -279,12 +279,13 @@ export default class Collection<DocType extends GongoDocument = GongoDocument> {
   async eventExec(
     eventName: EventName,
     props: CollectionEventProps<DocType>,
-    args?: Record<string, unknown>
+    args?: Record<string, unknown>,
   ) {
     if (!this._events[eventName])
       throw new Error("No such event: " + eventName);
 
-    for (const func of this._events[eventName]) await func.call(this, props, args);
+    for (const func of this._events[eventName])
+      await func.call(this, props, args);
   }
 
   async getReal() {
@@ -373,14 +374,14 @@ export default class Collection<DocType extends GongoDocument = GongoDocument> {
           } as GongoDocument as DocType,
           upsert: true /* XXX TODO */,
         },
-      }))
+      })),
     );
   }
 
   async replaceOne(
     filter: Filter<DocType>,
     doc: DocType,
-    options?: ReplaceOptions
+    options?: ReplaceOptions,
   ) {
     const realColl = await this.getReal();
 
@@ -395,7 +396,7 @@ export default class Collection<DocType extends GongoDocument = GongoDocument> {
   async updateOne(
     filter: Filter<DocType>,
     update: Partial<DocType> | UpdateFilter<DocType> = {},
-    options?: UpdateOptions
+    options?: UpdateOptions,
   ) {
     const realColl = await this.getReal();
 

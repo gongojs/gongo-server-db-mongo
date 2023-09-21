@@ -4,12 +4,8 @@ import type {
   DbaUsers,
   Profile,
 } from "gongo-server/lib/DatabaseAdapter.js";
-import { ObjectId } from "bson";
-import type {
-  Document,
-  Filter,
-  WithId,
-} from "mongodb";
+import { ObjectId } from "./objectid";
+import type { Document, Filter, WithId } from "mongodb";
 
 import type DatabaseAdapter from "./databaseAdapter.js";
 import type { MongoDbaUser } from "./databaseAdapter.js";
@@ -43,14 +39,16 @@ export default class Users implements DbaUsers {
 
   async setSessionData(sid: string, data: Record<string, unknown>) {
     await this.sessions.updateOne(
-      { $or: [{_id: sid}, { sessionToken: sid }] } ,
+      { $or: [{ _id: sid }, { sessionToken: sid }] },
       { $set: data },
-      { upsert: true }
+      { upsert: true },
     );
   }
 
   async getSessionData(sid: string) {
-    return await this.sessions.findOne({ $or: [{_id: sid}, { sessionToken: sid }] });
+    return await this.sessions.findOne({
+      $or: [{ _id: sid }, { sessionToken: sid }],
+    });
   }
 
   async getUserWithEmailAndPassword() {
@@ -89,7 +87,7 @@ export default class Users implements DbaUsers {
   */
 
   async createUser(
-    callback?: (dbaUser: Partial<MongoDbaUser>) => void
+    callback?: (dbaUser: Partial<MongoDbaUser>) => void,
   ): Promise<MongoDbaUser> {
     const user: Partial<MongoDbaUser> = {
       emails: [],
@@ -100,13 +98,13 @@ export default class Users implements DbaUsers {
 
     const result = await this.users.insertOne(user);
     // This doesn't always work, must be multiple copies of bson package
-    if (result.acknowledged && result.insertedId/* instanceof ObjectId */) {
-      user._id = result.insertedId;
+    if (result.acknowledged && result.insertedId /* instanceof ObjectId */) {
+      user._id = result.insertedId as ObjectId; // we shouldn't need "as" here?
       return user as MongoDbaUser;
     } else {
       // console.log(result);
       throw new Error(
-        "Unexpected mongo result in createUser():" + JSON.stringify(result)
+        "Unexpected mongo result in createUser():" + JSON.stringify(result),
       );
     }
   }
@@ -118,7 +116,7 @@ export default class Users implements DbaUsers {
     id: string,
     profile: Profile,
     accessToken: string,
-    refreshToken: string
+    refreshToken: string,
   ): Promise<MongoDbaUser> {
     const filter: Filter<Document> = { $or: [] };
     const $or = filter.$or as Filter<WithId<Document>>[];
@@ -134,7 +132,7 @@ export default class Users implements DbaUsers {
           "Ignoring unknown email type" +
             typeof email +
             " " +
-            JSON.stringify(email)
+            JSON.stringify(email),
         );
       }
     }
@@ -149,7 +147,7 @@ export default class Users implements DbaUsers {
       // Update service info & add any missing fields
 
       user.services = user.services.filter(
-        (s: DbaUserService) => !(s.service === service && s.id === id)
+        (s: DbaUserService) => !(s.service === service && s.id === id),
       );
       user.services.push({ service, id, profile, accessToken, refreshToken });
 
@@ -167,7 +165,7 @@ export default class Users implements DbaUsers {
 
       if (!user.photos) user.photos = [];
       user.photos = user.photos.filter(
-        (photo: Record<string, string>) => photo.provider !== profile.provider
+        (photo: Record<string, string>) => photo.provider !== profile.provider,
       );
       if (profile.photos) {
         for (const photo of profile.photos) {

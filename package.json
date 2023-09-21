@@ -35,19 +35,21 @@
     "@types/jest": "^29.5.4",
     "@typescript-eslint/eslint-plugin": "^6.5.0",
     "@typescript-eslint/parser": "^6.5.0",
-    "bson": "5.4.0",
+    "bson": "5.5.0",
     "eslint": "^8.17.0",
     "eslint-config-prettier": "^9.0.0",
     "jest": "^29.6.4",
     "mongo-mock": "^4.1.0",
-    "mongodb": "5.8.1",
+    "mongodb": "5.9.0",
+    "mongodb-rest-relay": "1.9.2",
     "prettier": "^3.0.2",
     "ts-jest": "^29.1.1",
     "typescript": "5.2.2"
   },
   "peerDependencies": {
-    "bson": "5.4.0",
+    "bson": "5.5.0",
     "gongo-server": "^3.3.1",
-    "mongodb": "5.8.1"
+    "mongodb": "5.8.1",
+    "mongodb-rest-relay": "1.9.2"
   }
 }
