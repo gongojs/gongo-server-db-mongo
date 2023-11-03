@@ -50,6 +50,6 @@
     "bson": "6.2.0",
     "gongo-server": "^3.3.1",
     "mongodb": "6.2.0",
-    "mongodb-rest-relay": "1.9.2"
+    "mongodb-rest-relay": "1.9.3"
   }
 }
