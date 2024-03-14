@@ -453,18 +453,57 @@ export default class Collection<DocType extends GongoDocument = GongoDocument> {
         try {
           return await this.updateOne(idFilter, update);
         } catch (error) {
-          console.log("Skipping toMongoDb update because of error.");
+          console.log("Skipping updateOne update because of error.");
           console.log(error);
           fallback = true;
+          return null;
         }
       })();
 
-      console.log(result);
-      return result;
+      if (result) {
+        console.log(result);
+        return result;
+      }
     }
 
     if (fallback) {
       console.log("Falling back to apply patch directly and replaceOne");
+      const result = { ...orig };
+      const validateOperation = true;
+
+      for (const operation of entry.patch) {
+        // https://github.com/Starcounter-Jack/JSON-Patch/issues/280#issuecomment-1980435509
+        try {
+          jsonpatch.applyOperation(result, operation, validateOperation);
+        } catch (e) {
+          const error = e as jsonpatch.JsonPatchError;
+          // Try to recover:
+          if (error.name === "OPERATION_PATH_UNRESOLVABLE") {
+            if (operation.op === "replace") {
+              // Can happen e.g. when states are like this:
+              // from.schaden = undefined;
+              // to.schaden.id = 'some-id';
+              // @ts-expect-error: but its exactly what i want to do.
+              operation.op = "add"; // try it once more with operation "add" instead
+              jsonpatch.applyOperation(document, operation, validateOperation);
+            } else if (operation.op === "remove") {
+              // Can happen e.g. when states are like this:
+              // from.entity.begruendung = null;
+              // to.entity.begruendung = undefined;
+              // we don't do anything in this case because "to" is already in a good state!
+            }
+          } else {
+            // otherwise we just rethrow ...
+            throw error;
+          }
+        }
+      }
+
+      // If we got this far, there were no errors.
+      // @ts-expect-error: another day
+      this.replaceOne(idFilter, result);
+
+      /*
       const result = jsonpatch.applyPatch(orig, entry.patch, true);
       console.log(result);
 
@@ -473,6 +512,7 @@ export default class Collection<DocType extends GongoDocument = GongoDocument> {
         this.replaceOne(idFilter, result.newDocument);
       } else console.log(result);
       throw new Error("No newDocument on jsonpatch.applyPatch result");
+      */
     }
 
     return { _id: entry._id, $success: true };
