@@ -137,8 +137,19 @@ export async function userIdMatches<DocType extends GongoDocument>(
     );
   }
 
+  /*
   console.log({ doc, userId });
-  return userId.equals(doc.userId) || "doc.userId !== userId (for unmatched)";
+  console.log(1, userId.toHexString());
+  console.log(2, doc.userId?.toString());
+  console.log(3, userId.equals(doc.userId));
+  */
+
+  return (
+    userId.toHexString() === (doc.userId?.toHexString() || doc.userId) ||
+    "doc.userId !== userId (for unmatched)"
+  );
+  // [TypeError: Cannot read properties of undefined (reading '11')]
+  // return userId.equals(doc.userId) || "doc.userId !== userId (for unmatched)";
 }
 
 export default class Collection<DocType extends GongoDocument = GongoDocument> {
