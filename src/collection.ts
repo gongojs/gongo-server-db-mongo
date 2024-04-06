@@ -496,7 +496,7 @@ export default class Collection<DocType extends GongoDocument = GongoDocument> {
               // to.schaden.id = 'some-id';
               // @ts-expect-error: but its exactly what i want to do.
               operation.op = "add"; // try it once more with operation "add" instead
-              jsonpatch.applyOperation(document, operation, validateOperation);
+              jsonpatch.applyOperation(result, operation, validateOperation);
             } else if (operation.op === "remove") {
               // Can happen e.g. when states are like this:
               // from.entity.begruendung = null;
