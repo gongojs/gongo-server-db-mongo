@@ -26,6 +26,18 @@ export type EnhancedOmit<TRecordOrUnion, KeyUnion> =
     ? Pick<TRecordOrUnion, Exclude<keyof TRecordOrUnion, KeyUnion>> // discriminated unions
     : never;
 
+/**
+ * Also known as homomorphic.
+ * Use this custom Omit utility type to preserve extended Record properties.
+ *
+ * Why? Using Omit on extended Records does not preserve the structure.
+ * - https://github.com/microsoft/TypeScript/issues/36981
+ * - https://github.com/microsoft/TypeScript/issues/54451
+ */
+export type MappedOmit<T, K extends keyof T> = {
+  [P in keyof T as P extends K ? never : P]: T[P];
+};
+
 export interface GongoDocument extends MongoDocument {
   __deleted?: boolean;
   __updatedAt?: number;
