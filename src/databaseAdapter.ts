@@ -379,6 +379,10 @@ class MongoDatabaseAdapter implements DatabaseAdapter<MongoDatabaseAdapter> {
       return publishResult;
     }
   }
+
+  str2id(strId: string) {
+    return ObjectId.createFromHexString(strId);
+  }
 }
 
 // At time of writing, Cursor / Collection was only used by Database class
