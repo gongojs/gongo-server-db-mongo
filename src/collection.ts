@@ -65,6 +65,21 @@ const asyncFilter = async <T>(
 type ArrayElement<ArrayType extends readonly unknown[]> =
   ArrayType extends readonly (infer ElementType)[] ? ElementType : never;
 
+// Never figured out why sometimes objectId.equals() throws this, but
+// easy to work around.
+// [TypeError: Cannot read properties of undefined (reading '11')]
+export function objectIdsEqual(a?: ObjectId | string, b?: ObjectId | string) {
+  /*
+  console.log({ doc, userId });
+  console.log(1, userId.toHexString());
+  console.log(2, doc.userId?.toString());
+  console.log(3, userId.equals(doc.userId));
+  */
+  const aOid = typeof a === "string" ? new ObjectId(a) : a;
+  const bOid = typeof b === "string" ? new ObjectId(b) : b;
+  return aOid?.toHexString() === bOid?.toHexString();
+}
+
 export interface CollectionEventProps<
   DocType extends GongoDocument = GongoDocument,
 > extends MethodProps<DatabaseAdapter> {
@@ -133,7 +148,8 @@ export async function userIdMatches<DocType extends GongoDocument>(
     const existingDoc = await collection.findOne(docId);
     if (!existingDoc) return "NO_EXISTING_DOC";
     return (
-      userId.equals(existingDoc.userId) || "doc.userId !== userId (for patch)"
+      objectIdsEqual(userId, existingDoc.userId) ||
+      "doc.userId !== userId (for patch)"
     );
   }
 
@@ -145,23 +161,15 @@ export async function userIdMatches<DocType extends GongoDocument>(
     const existingDoc = await collection.findOne(query);
     if (!existingDoc) return "NO_EXISTING_DOC";
     return (
-      userId.equals(existingDoc.userId) || "doc.userId !== userId (for delete)"
+      objectIdsEqual(userId, existingDoc.userId) ||
+      "doc.userId !== userId (for delete)"
     );
   }
 
-  /*
-  console.log({ doc, userId });
-  console.log(1, userId.toHexString());
-  console.log(2, doc.userId?.toString());
-  console.log(3, userId.equals(doc.userId));
-  */
-
   return (
-    userId.toHexString() === (doc.userId?.toHexString() || doc.userId) ||
+    objectIdsEqual(userId, doc.userId) ||
     "doc.userId !== userId (for unmatched)"
   );
-  // [TypeError: Cannot read properties of undefined (reading '11')]
-  // return userId.equals(doc.userId) || "doc.userId !== userId (for unmatched)";
 }
 
 export default class Collection<DocType extends GongoDocument = GongoDocument> {
